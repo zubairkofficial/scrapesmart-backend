@@ -8,13 +8,11 @@ export class AuthGuard extends PAuthGuard('jwt') {
   constructor(private reflector: Reflector) {
     super();
   }
-  
+
   canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
-    
-        const request = context.switchToHttp().getRequest();
-        const user = request.user;
-    
-        console.log(user);
+    const request = context.switchToHttp().getRequest();
+    const user = request.user;
+
     const roles = this.reflector.get<string[]>('roles', context.getHandler()) || this.reflector.get<string[]>('roles', context.getClass());
     if (!roles) {
       return true;
