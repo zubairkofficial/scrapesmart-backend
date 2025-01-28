@@ -16,7 +16,7 @@ export class User extends EntityBase {
   @Column({ type: 'varchar' })
   password: string;
 
-  @Column({ type: 'tinyint', default: false })
+  @Column({ type: 'boolean', default: false })
   isEmailVerified: boolean;
 
   @BeforeInsert()

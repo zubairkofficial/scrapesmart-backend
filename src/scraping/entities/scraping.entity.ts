@@ -4,7 +4,7 @@ import { Entity, Column, ManyToOne } from 'typeorm';
 
 @Entity()
 export class ScrapingDocument extends EntityBase {
-  @Column({ type: 'longtext', nullable: true })
+  @Column({ type: 'text', nullable: true })
   pageContent: string;
 
   @Column({ type: 'json', nullable: true })
