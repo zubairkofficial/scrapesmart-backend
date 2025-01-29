@@ -1,7 +1,7 @@
 import { InvalidTokenException } from '@/common/exceptions';
 import { User } from '@/user/entities/user.entity';
 import { UserService } from '@/user/user.service';
-import { InjectRedis } from '@liaoliaots/nestjs-redis';
+import { RedisService } from "@liaoliaots/nestjs-redis";
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
@@ -9,13 +9,17 @@ import Redis from 'ioredis';
 
 @Injectable()
 export class TokenService {
+  private readonly redisClient: Redis | null;
+
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly userService: UserService,
 
-    @InjectRedis() private redisClient: Redis,
-  ) { }
+    private readonly redisService: RedisService
+  ) {
+    this.redisClient = this.redisService.getOrThrow();
+  }
 
   signAuthTokens(user: User) {
     const accessToken = this.signAccessToken(user);
