@@ -20,10 +20,11 @@ export class ChatService {
     });
   }
 
-  async getMessages(userID: string): Promise<Chat[]> {
+  async getChatList(userID: string): Promise<Chat[]> {
     return this.chatsRepository.find({
       where: { user: { ID: userID } },
       order: { createdAt: 'DESC' },
+      select: ['ID', 'title', 'createdAt'],
     });
   }
 

@@ -18,8 +18,8 @@ export class ChatController {
   }
 
   @Get('list')
-  async getMessages(@CurrentUser() user: CurrentUserType) {
+  async getChatList(@CurrentUser() user: CurrentUserType) {
     console.log(user);
-    return this.chatService.getMessages(user.ID);
+    return this.chatService.getChatList(user.ID);
   }
 }
