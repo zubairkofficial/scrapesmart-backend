@@ -3,14 +3,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, Repository } from 'typeorm/index';
 import { User } from './entities/user.entity';
 import { ICreateUser, IUpdateUser } from './user.types';
-import { NotFoundError } from 'rxjs';
 
 @Injectable()
 export class UserService {
   constructor(
     @InjectRepository(User)
     private usersRepository: Repository<User>,
-  ) {}
+  ) { }
 
   async createUser(input: ICreateUser) {
     const user = new User();

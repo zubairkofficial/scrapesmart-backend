@@ -42,8 +42,9 @@ export class AuthService {
       throw new UnauthorizedException('Invalid Credentials');
     }
 
-    const tokens = this.tokenService.signAuthTokens(user);
+    const tokens = await this.tokenService.signAuthTokens(user, input.rememberMe);
 
+    delete user.password;
     return { ...tokens, user };
   }
 

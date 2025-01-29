@@ -21,14 +21,16 @@ export class TokenService {
     this.redisClient = this.redisService.getOrThrow();
   }
 
-  signAuthTokens(user: User) {
-    const accessToken = this.signAccessToken(user);
-    const refreshToken = this.signRefreshToken(user);
+  async signAuthTokens(user: User, rememberME: boolean) {
+    const tokens = {
+      accessToken: "",
+      refreshToken: ""
+    }
 
-    return {
-      accessToken,
-      refreshToken,
-    };
+    tokens.accessToken = this.signAccessToken(user);
+    rememberME && (tokens.refreshToken = await this.signRefreshToken(user))
+
+    return tokens
   }
 
   signAccessToken(user: User) {
@@ -104,7 +106,12 @@ export class TokenService {
   }
 
   async verifyEmailVerificationToken(token: string): Promise<string> {
-    const decodedToken = this.jwtService.verify(token);
+    let decodedToken;
+    try {
+      decodedToken = this.jwtService.verify(token);
+    } catch (error) {
+      throw new InvalidTokenException('Token not found/expired');
+    }
 
     if (!decodedToken || !decodedToken.email) {
       throw new InvalidTokenException();

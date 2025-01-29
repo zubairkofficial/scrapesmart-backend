@@ -20,7 +20,6 @@ export class ChatController {
 
   @Get('list')
   async getChatList(@CurrentUser() user: CurrentUserType) {
-    console.log(user);
     return this.chatService.getChatList(user.ID);
   }
 
