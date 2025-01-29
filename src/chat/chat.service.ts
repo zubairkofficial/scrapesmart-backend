@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { z } from "zod";
 import { ChatInfoDTO } from "./dto/chatInfo.dto";
 import { Chat } from "./entities/chat.entity";
 
@@ -42,10 +43,14 @@ export class ChatService {
     }
 
     if (!chat || !chatID) {
-      const titleResponse = await this.model.invoke(
+      const titleSchema = z.object({
+        title: z.string(),
+      });
+      const titleModel = this.model.withStructuredOutput(titleSchema);
+      const titleResponse = await titleModel.invoke(
         [{
           role: 'system',
-          content: "generate a title for chat history by using the first message you can have text wrapped in quotes but, don't wrap the entire message",
+          content: "generate a title for chat history by using the first message",
         }, {
           role: 'user',
           content: message,
@@ -53,7 +58,7 @@ export class ChatService {
       );
 
       chat = this.chatsRepository.create({
-        title: titleResponse.content as string,
+        title: titleResponse?.title || "Untitled Chat",
         messages: [],
         user: {
           ID: userID
