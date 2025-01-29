@@ -3,6 +3,7 @@ import { Injectable } from '@nestjs/common';
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
+import { ChatInfoDTO } from "./dto/chatInfo.dto";
 import { Chat } from "./entities/chat.entity";
 
 @Injectable()
@@ -44,7 +45,7 @@ export class ChatService {
       const titleResponse = await this.model.invoke(
         [{
           role: 'system',
-          content: 'generate a title for chat history by using the first message',
+          content: "generate a title for chat history by using the first message you can have text wrapped in quotes but, don't wrap the entire message",
         }, {
           role: 'user',
           content: message,
@@ -67,6 +68,17 @@ export class ChatService {
     chat.messages.push({ role: 'assistant', content: response.content as string });
 
     await this.chatsRepository.save(chat);
-    return response.content as string;
+    return chatID;
+  }
+
+  async getChatInfo(userID: string, info: ChatInfoDTO): Promise<Chat> {
+    return this.chatsRepository.findOne({
+      where: {
+        ID: info.chatID,
+        user: {
+          ID: userID,
+        }
+      }
+    });
   }
 }

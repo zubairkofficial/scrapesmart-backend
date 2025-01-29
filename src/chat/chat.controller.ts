@@ -3,6 +3,7 @@ import { CurrentUser } from "@/common/decorators/currentUser.decorator";
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { ChatService } from "./chat.service";
+import { ChatInfoDTO } from "./dto/chatInfo.dto";
 import { MessageDTO } from "./dto/message.dto";
 
 @Controller('chat')
@@ -13,7 +14,7 @@ export class ChatController {
 
   @Post('message')
   async generateResponse(@Body() messageBody: MessageDTO, @CurrentUser() user: CurrentUserType) {
-    const response = await this.chatService.chat(messageBody.message, user.ID);
+    const response = await this.chatService.chat(messageBody.message, user.ID, messageBody.chatID);
     return { response };
   }
 
@@ -21,5 +22,10 @@ export class ChatController {
   async getChatList(@CurrentUser() user: CurrentUserType) {
     console.log(user);
     return this.chatService.getChatList(user.ID);
+  }
+
+  @Post('info')
+  async getChatInfo(@CurrentUser() user: CurrentUserType, @Body() infoBody: ChatInfoDTO) {
+    return this.chatService.getChatInfo(user.ID, infoBody);
   }
 }
