@@ -20,8 +20,8 @@
     "test:e2e": "jest --config ./test/jest-e2e.json"
   },
   "dependencies": {
-    "@langchain/community": "^0.3.27",
-    "@langchain/core": "^0.3.36",
+    "@langchain/community": "^0.3.28",
+    "@langchain/core": "^0.3.37",
     "@langchain/openai": "^0.4.2",
     "@liaoliaots/nestjs-redis": "^10.0.0",
     "@nestjs-modules/mailer": "^2.0.2",
@@ -39,7 +39,7 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.1",
     "ioredis": "^5.4.2",
-    "langchain": "^0.3.14",
+    "langchain": "^0.3.15",
     "nestjs-resend": "^1.0.1",
     "nodemailer": "^6.10.0",
     "passport": "^0.7.0",
@@ -56,6 +56,7 @@
     "@nestjs/cli": "^11.0.2",
     "@nestjs/schematics": "^11.0.0",
     "@nestjs/testing": "^11.0.6",
+    "@types/bcrypt": "^5.0.2",
     "@types/express": "^5.0.0",
     "@types/jest": "^29.5.14",
     "@types/node": "^22.12.0",
