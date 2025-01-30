@@ -1,15 +1,17 @@
-import { Module } from '@nestjs/common';
-import { AuthModule } from './auth/auth.module';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { DataSource } from 'typeorm';
-import { UserModule } from './user/user.module';
 import { RedisModule as NRedisModule, RedisModuleOptions } from '@liaoliaots/nestjs-redis';
-import { SharedModule } from './shared/shared.module';
-import { ScrapingModule } from './scraping/scraping.module';
+import { Module } from '@nestjs/common';
+import { ConfigModule, ConfigService } from '@nestjs/config';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DataSource } from 'typeorm';
+import { AppController } from "./app.controller";
+import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
+import { ScrapingModule } from './scraping/scraping.module';
+import { SharedModule } from './shared/shared.module';
+import { UserModule } from './user/user.module';
 
 @Module({
+  controllers: [AppController],
   imports: [
     NRedisModule.forRootAsync({
       imports: [ConfigModule],
@@ -54,4 +56,4 @@ import { ChatModule } from './chat/chat.module';
     ChatModule,
   ],
 })
-export class AppModule {}
+export class AppModule { }
