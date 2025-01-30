@@ -3,8 +3,7 @@ import { MailService } from './mail.service';
 
 @Global()
 @Module({
-  imports: [
-  ],
+  imports: [],
   providers: [MailService],
   exports: [MailService],
 })

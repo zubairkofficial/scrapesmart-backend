@@ -84,6 +84,8 @@ export class AuthService {
       throw new BadRequestException('Email already verified');
     }
 
-    await this.tokenService.signEmailVerificationToken(user.email);
+    const token = await this.tokenService.signEmailVerificationToken(user.email);
+
+    await this.mailService.sendVerificationMail({ email: user.email, firstName: user.firstName, token });
   }
 }
