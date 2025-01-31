@@ -1,15 +1,12 @@
 import { Page, PlaywrightWebBaseLoader } from '@langchain/community/document_loaders/web/playwright';
-import { Injectable } from '@nestjs/common';
-import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
+import { Inject, Injectable } from '@nestjs/common';
 import { ScrapeSourceInput } from './dto/scraping.dto';
-import { ScrapingDocument } from './entities/scraping.entity';
 
 @Injectable()
 export class ScrapingService {
   constructor(
-    @InjectRepository(ScrapingDocument)
-    private scrapingDocumentRepository: Repository<ScrapingDocument>,
+    @Inject('PGVectorStore') private pgVectorStore: PGVectorStore
   ) { }
 
   async scrapeSource(input: ScrapeSourceInput, user: CurrentUserType) {
@@ -27,16 +24,15 @@ export class ScrapingService {
     });
     const docs = await loader.load();
 
-    // Save documents to database
-    const scrapingDocuments = docs.map((doc) =>
-      this.scrapingDocumentRepository.create({
-        pageContent: doc.pageContent,
-        metadata: doc.metadata,
+    const vectorDocs = docs.map((doc) => ({
+      pageContent: doc.pageContent,
+      metadata: {
         source: doc.metadata?.source,
         user: user,
-      }),
-    );
+        createdAt: new Date(),
+      }
+    }));
 
-    await this.scrapingDocumentRepository.save(scrapingDocuments);
+    this.pgVectorStore.addDocuments(vectorDocs);
   }
 }

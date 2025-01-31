@@ -1,12 +1,11 @@
 import { Module } from '@nestjs/common';
-import { ScrapingService } from './scraping.service';
+import { PGVectorStoreProvider } from "./pg-vector-store.provider";
 import { ScrapingController } from './scraping.controller';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { ScrapingDocument } from './entities/scraping.entity';
+import { ScrapingService } from './scraping.service';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ScrapingDocument])],
+  imports: [],
   controllers: [ScrapingController],
-  providers: [ScrapingService],
+  providers: [ScrapingService, PGVectorStoreProvider],
 })
-export class ScrapingModule {}
+export class ScrapingModule { }
