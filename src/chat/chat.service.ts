@@ -21,7 +21,6 @@ export class ChatService {
     this.model = new ChatOpenAI({
       model: "gpt-3.5-turbo",
       openAIApiKey: apiKey,
-      temperature: 0.7, // Adjust creativity
     });
   }
 
