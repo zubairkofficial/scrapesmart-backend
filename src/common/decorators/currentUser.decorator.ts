@@ -13,7 +13,6 @@ export const CurrentUser = createParamDecorator(async (_data: unknown, context: 
   const token = authHeader.split(' ')[1];
 
   const decodedData = jwtService.decode(token);
-  console.log(decodedData);
 
   const user: CurrentUserType = {
     ID: decodedData['ID'],

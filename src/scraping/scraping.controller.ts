@@ -13,6 +13,6 @@ export class ScrapingController {
 
   @Post()
   async scrapeSource(@Body() input: ScrapeSourceInput, @CurrentUser() user: CurrentUserType) {
-    await this.scrapingService.scrapeSourceWithCheerio(input, user);
+    await this.scrapingService.scrapeSource(input, user);
   }
 }
