@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { PGVectorStoreProvider } from "./pg-vector-store.provider";
+import { PGVectorStoreProvider } from "../common/providers/pg-vector-store.provider";
 import { ScrapingController } from './scraping.controller';
 import { ScrapingService } from './scraping.service';
 

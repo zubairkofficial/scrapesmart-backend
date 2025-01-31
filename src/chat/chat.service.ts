@@ -1,5 +1,6 @@
+import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { ChatOpenAI } from "@langchain/openai";
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
@@ -11,14 +12,16 @@ import { Chat } from "./entities/chat.entity";
 export class ChatService {
   private model: ChatOpenAI;
 
-  constructor(private configService: ConfigService, @InjectRepository(Chat)
-  private chatsRepository: Repository<Chat>) {
+  constructor(
+    private configService: ConfigService,
+    @InjectRepository(Chat) private chatsRepository: Repository<Chat>,
+    @Inject('PGVectorStore') private pgVectorStore: PGVectorStore
+  ) {
     const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     this.model = new ChatOpenAI({
       model: "gpt-3.5-turbo",
       openAIApiKey: apiKey,
       temperature: 0.7, // Adjust creativity
-      maxTokens: 100, // Adjust length of response
     });
   }
 
@@ -66,11 +69,27 @@ export class ChatService {
       })
     }
 
+    const docs = await this.pgVectorStore.similaritySearch(message, 10, {
+      user: {
+        ID: userID,
+      },
+    });
+
+    chat.messages.unshift({
+      role: 'system',
+      content: `
+        Use the following context to generate a response:
+        ${docs.map((doc) => doc.pageContent).join('\n\n')} ')}
+      `,
+    });
+
     chat.messages.push({ role: 'user', content: message });
     const response = await this.model.invoke(
       chat.messages as { role: 'user' | 'assistant'; content: string }[]
     );
     chat.messages.push({ role: 'assistant', content: response.content as string });
+
+    chat.messages.shift()
 
     await this.chatsRepository.save(chat);
     return chatID;

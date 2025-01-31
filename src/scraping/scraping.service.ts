@@ -1,5 +1,6 @@
 import { Page, PlaywrightWebBaseLoader } from '@langchain/community/document_loaders/web/playwright';
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
+import { CharacterTextSplitter } from "@langchain/textsplitters";
 import { Inject, Injectable } from '@nestjs/common';
 import { ScrapeSourceInput } from './dto/scraping.dto';
 
@@ -20,15 +21,21 @@ export class ScrapingService {
       evaluate: async (page: Page) => {
         const content = page.innerText("body")
         return content;
-      }
+      },
     });
-    const docs = await loader.load();
+    const pages = await loader.load();
+
+    const textSplitter = new CharacterTextSplitter({
+      chunkSize: 100,
+      chunkOverlap: 20,
+    });
+    const docs = await textSplitter.splitDocuments(pages);
 
     const vectorDocs = docs.map((doc) => ({
       pageContent: doc.pageContent,
       metadata: {
         source: doc.metadata?.source,
-        user: user,
+        user: user.ID,
         createdAt: new Date(),
       }
     }));
