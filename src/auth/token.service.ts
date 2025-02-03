@@ -1,25 +1,22 @@
 import { InvalidTokenException } from '@/common/exceptions';
 import { User } from '@/user/entities/user.entity';
 import { UserService } from '@/user/user.service';
-import { RedisService } from "@liaoliaots/nestjs-redis";
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-import Redis from 'ioredis';
+import { InjectRepository } from "@nestjs/typeorm";
+import { MoreThan, Repository } from "typeorm";
+import { AuthToken } from "./entities/AuthToken.entity";
+import { AuthTokenType } from "./types";
 
 @Injectable()
 export class TokenService {
-  private readonly redisClient: Redis | null;
-
   constructor(
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly userService: UserService,
-
-    private readonly redisService: RedisService
-  ) {
-    this.redisClient = this.redisService.getOrThrow();
-  }
+    @InjectRepository(AuthToken) private readonly authTokenRepository: Repository<AuthToken>
+  ) { }
 
   async signAuthTokens(user: User, rememberME: boolean) {
     const tokens = {
@@ -40,7 +37,9 @@ export class TokenService {
   async signRefreshToken(user: User) {
     const token = this.jwtService.sign({ ID: user.ID }, { expiresIn: `${this.configService.get('REFRESH_TOKEN_EXPIRATION')}s` });
 
-    await this.redisClient.setex(`refresh_token:${user.ID}`, this.configService.get('REFRESH_TOKEN_EXPIRATION'), token);
+    await this.authTokenRepository.save(this.authTokenRepository.create({
+      identifier: user.ID, token, type: AuthTokenType.refreshToken, TTL: new Date(Date.now() + this.configService.get('REFRESH_TOKEN_EXPIRATION') * 1000)
+    }));
 
     return token;
   }
@@ -49,9 +48,9 @@ export class TokenService {
     try {
       const decoded = this.jwtService.verify(refreshToken);
 
-      const storedToken = await this.redisClient.get(`refresh_token:${decoded.ID}`);
+      const storedToken = await this.authTokenRepository.findOne({ where: { identifier: decoded.ID, token: refreshToken, type: AuthTokenType.refreshToken } });
 
-      if (!storedToken || storedToken !== refreshToken) {
+      if (!storedToken) {
         throw new InvalidTokenException('Invalid refresh token');
       }
 
@@ -66,13 +65,11 @@ export class TokenService {
     }
   }
 
-  async revokeRefreshToken(userId: string) {
-    await this.redisClient.del(`refresh_token:${userId}`);
-  }
-
   async signResetPasswordToken(email: string) {
     const token = this.jwtService.sign({ email }, { expiresIn: `${this.configService.get('RESET_PASSWORD_TOKEN_EXPIRATION')}s` });
-    await this.redisClient.setex(`reset_password:${email}`, this.configService.get('RESET_PASSWORD_TOKEN_EXPIRATION'), token);
+    await this.authTokenRepository.save(this.authTokenRepository.create({
+      identifier: email, token, type: AuthTokenType.resetPassword, TTL: new Date(Date.now() + this.configService.get('RESET_PASSWORD_TOKEN_EXPIRATION') * 1000)
+    }));
 
     return token;
   }
@@ -83,16 +80,12 @@ export class TokenService {
       throw new InvalidTokenException();
     }
 
-    const storedToken = await this.redisClient.get(`reset_password:${decodedToken.email}`);
+    const storedToken = await this.authTokenRepository.findOne({ where: { identifier: decodedToken.email, token, type: AuthTokenType.resetPassword, TTL: MoreThan(new Date()) } });
     if (!storedToken) {
       throw new InvalidTokenException('Token not found/expired');
     }
 
-    if (storedToken !== token) {
-      throw new BadRequestException('Token not matching');
-    }
-
-    await this.redisClient.del(`reset_password:${decodedToken.email}`);
+    await this.authTokenRepository.delete({ type: AuthTokenType.resetPassword, identifier: decodedToken.email, token });
 
     return decodedToken.email;
   }
@@ -100,7 +93,9 @@ export class TokenService {
   async signEmailVerificationToken(email: string) {
     const token = this.jwtService.sign({ email }, { expiresIn: `${this.configService.get('EMAIL_VERIFICATION_TOKEN_EXPIRATION')}s` });
 
-    await this.redisClient.setex(`email_verification:${email}`, this.configService.get('EMAIL_VERIFICATION_TOKEN_EXPIRATION'), token);
+    await this.authTokenRepository.save(this.authTokenRepository.create({
+      identifier: email, token, type: AuthTokenType.emailVerification, TTL: new Date(Date.now() + this.configService.get('EMAIL_VERIFICATION_TOKEN_EXPIRATION') * 1000)
+    }));
 
     return token;
   }
@@ -117,16 +112,13 @@ export class TokenService {
       throw new InvalidTokenException();
     }
 
-    const storedToken = await this.redisClient.get(`email_verification:${decodedToken.email}`);
+    const storedToken = await this.authTokenRepository.findOne({ where: { identifier: decodedToken.email, token, type: AuthTokenType.emailVerification, TTL: MoreThan(new Date()) } });
+
     if (!storedToken) {
       throw new InvalidTokenException('Token not found/expired');
     }
 
-    if (storedToken !== token) {
-      throw new BadRequestException('Token not matching');
-    }
-
-    await this.redisClient.del(`email_verification:${decodedToken.email}`);
+    await storedToken.remove();
 
     return decodedToken.email;
   }

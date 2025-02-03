@@ -1,4 +1,3 @@
-import { RedisModule as NRedisModule, RedisModuleOptions } from '@liaoliaots/nestjs-redis';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
@@ -6,6 +5,7 @@ import { DataSource } from 'typeorm';
 import { AppController } from "./app.controller";
 import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
+import { AuthTokenSubscriber } from "./common/subscribers/AuthToken.subscriber";
 import { ScrapingModule } from './scraping/scraping.module';
 import { SharedModule } from './shared/shared.module';
 import { UserModule } from './user/user.module';
@@ -13,13 +13,6 @@ import { UserModule } from './user/user.module';
 @Module({
   controllers: [AppController],
   imports: [
-    NRedisModule.forRootAsync({
-      imports: [ConfigModule],
-      useFactory: async (configService: ConfigService): Promise<RedisModuleOptions> => ({
-        config: { url: configService.get<string>('REDIS_URI') },
-      }),
-      inject: [ConfigService],
-    }),
     TypeOrmModule.forRootAsync({
       imports: [ConfigModule],
       inject: [ConfigService],
@@ -32,6 +25,7 @@ import { UserModule } from './user/user.module';
           username: configService.get<string>('DB_USERNAME'),
           password: configService.get<string>('DB_PASSWORD'),
           database: configService.get<string>('DB_NAME'),
+          subscribers: [AuthTokenSubscriber],
           entities: [`dist/**/entities/*.js`],
           synchronize: true, // TODO: for development purpose
           logging: true,
