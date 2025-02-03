@@ -1,9 +1,8 @@
 import { AuthGuard } from "@/auth/guards/auth.guard";
 import { CurrentUser } from "@/common/decorators/currentUser.decorator";
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { ChatService } from "./chat.service";
-import { ChatInfoDTO } from "./dto/chatInfo.dto";
 import { MessageDTO } from "./dto/message.dto";
 
 @Controller('chat')
@@ -13,18 +12,18 @@ export class ChatController {
   constructor(private readonly chatService: ChatService) { }
 
   @Post('message')
-  async generateResponse(@Body() messageBody: MessageDTO, @CurrentUser() user: CurrentUserType) {
+  async message(@Body() messageBody: MessageDTO, @CurrentUser() user: CurrentUserType) {
     const response = await this.chatService.chat(messageBody.message, user.ID, messageBody.chatID);
     return { response };
   }
 
   @Get('list')
-  async getChatList(@CurrentUser() user: CurrentUserType) {
+  async chatList(@CurrentUser() user: CurrentUserType) {
     return this.chatService.getChatList(user.ID);
   }
 
-  @Post('info')
-  async getChatInfo(@CurrentUser() user: CurrentUserType, @Body() infoBody: ChatInfoDTO) {
-    return this.chatService.getChatInfo(user.ID, infoBody);
+  @Get(':id')
+  async chat(@CurrentUser() user: CurrentUserType, @Param('id', new ParseUUIDPipe()) chatID: string) {
+    return this.chatService.getChatInfo(user.ID, chatID);
   }
 }

@@ -5,7 +5,6 @@ import { ConfigService } from "@nestjs/config";
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { z } from "zod";
-import { ChatInfoDTO } from "./dto/chatInfo.dto";
 import { Chat } from "./entities/chat.entity";
 
 @Injectable()
@@ -94,10 +93,10 @@ export class ChatService {
     return chatID;
   }
 
-  async getChatInfo(userID: string, info: ChatInfoDTO): Promise<Chat> {
+  async getChatInfo(userID: string, chatID: string): Promise<Chat> {
     return this.chatsRepository.findOne({
       where: {
-        ID: info.chatID,
+        ID: chatID,
         user: {
           ID: userID,
         }
