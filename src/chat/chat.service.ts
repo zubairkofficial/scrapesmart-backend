@@ -76,7 +76,7 @@ export class ChatService {
     chat.messages.unshift({
       role: 'system',
       content: `
-        Use the following context to generate a response:
+        Use line breaks after each product and respond in markdown when listing products. Use the following context to generate a response:
         ${docs.map((doc) => doc.pageContent).join('\n\n')} ')}
       `,
     });
