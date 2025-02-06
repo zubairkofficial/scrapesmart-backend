@@ -1,7 +1,6 @@
 import { ExecutionContext, ForbiddenException, Injectable } from '@nestjs/common';
 import { Reflector } from "@nestjs/core";
 import { AuthGuard as PAuthGuard } from '@nestjs/passport';
-import { Observable } from "rxjs";
 
 @Injectable()
 export class AuthGuard extends PAuthGuard('jwt') {
@@ -9,7 +8,12 @@ export class AuthGuard extends PAuthGuard('jwt') {
     super();
   }
 
-  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean> {
+  async canActivate(context: ExecutionContext) {
+    const isValid = await super.canActivate(context);
+    if (!isValid) {
+      return false;
+    }
+
     const request = context.switchToHttp().getRequest();
     const user = request.user;
 
