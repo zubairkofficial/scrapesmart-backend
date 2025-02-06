@@ -1,6 +1,9 @@
+import { Settings } from "@/settings/entities/settings.entity";
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
+import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
+import { Repository } from "typeorm";
 import { z } from "zod";
 import { ScrapeSourceInput } from './dto/scraping.dto';
 
@@ -41,6 +44,7 @@ const productSchema = z.object({
 @Injectable()
 export class ScrapingService {
   constructor(
+    @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore,
   ) { }
 
@@ -188,6 +192,11 @@ export class ScrapingService {
   }
 
   async scrapeSource(input: ScrapeSourceInput, user: CurrentUserType) {
+    const settings = await this.settingsRepository.find();
+    if (!settings.length) {
+      throw new BadRequestException('Please set OpenAI API Key');
+    }
+
     const pageURLs = [];
     if (!URL.canParse(input.source)) {
       throw new BadRequestException()

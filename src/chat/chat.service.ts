@@ -1,7 +1,7 @@
+import { Settings } from "@/settings/entities/settings.entity";
 import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { ChatOpenAI } from "@langchain/openai";
-import { Inject, Injectable } from '@nestjs/common';
-import { ConfigService } from "@nestjs/config";
+import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import { Repository } from "typeorm";
 import { z } from "zod";
@@ -12,14 +12,12 @@ export class ChatService {
   private model: ChatOpenAI;
 
   constructor(
-    private configService: ConfigService,
     @InjectRepository(Chat) private chatsRepository: Repository<Chat>,
+    @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore
   ) {
-    const apiKey = this.configService.get<string>('OPENAI_API_KEY');
     this.model = new ChatOpenAI({
       model: "gpt-3.5-turbo",
-      openAIApiKey: apiKey,
     });
   }
 
@@ -32,6 +30,11 @@ export class ChatService {
   }
 
   async chat(message: string, userID: string, chatID?: string): Promise<string> {
+    const settings = await this.settingsRepository.find();
+    if (!settings.length) {
+      throw new BadRequestException('Please set OpenAI API Key');
+    }
+    this.model.apiKey = settings[0].openAIAPIKey;
     let chat: Chat;
     if (chatID) {
       chat = await this.chatsRepository.findOne({

@@ -6,12 +6,19 @@ import { OpenAIEmbeddings } from "@langchain/openai";
 import { Provider } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PoolConfig } from "pg";
+import { DataSource } from "typeorm";
 
 export const PGVectorStoreProvider: Provider = {
   provide: 'PGVectorStore',
-  useFactory: async (configService: ConfigService) => {
+  useFactory: async (configService: ConfigService, dataSource: DataSource) => {
+    const result = await dataSource.query(
+      `SELECT * FROM settings`
+    );
+
+    const apiKey = result?.[0]?.openAIAPIKey;
     const embeddings = new OpenAIEmbeddings({
       model: "text-embedding-3-small",
+      apiKey
     });
     const config = {
       postgresConnectionOptions: {
@@ -34,5 +41,5 @@ export const PGVectorStoreProvider: Provider = {
     };
     return await PGVectorStore.initialize(embeddings, config);
   },
-  inject: [ConfigService],
+  inject: [ConfigService, DataSource],
 };
