@@ -7,6 +7,7 @@ import { AuthModule } from './auth/auth.module';
 import { ChatModule } from './chat/chat.module';
 import { AuthTokenSubscriber } from "./common/subscribers/AuthToken.subscriber";
 import { ScrapingModule } from './scraping/scraping.module';
+import { SettingsModule } from "./settings/settings.module";
 import { SharedModule } from './shared/shared.module';
 import { UserModule } from './user/user.module';
 
@@ -48,6 +49,7 @@ import { UserModule } from './user/user.module';
     SharedModule,
     ScrapingModule,
     ChatModule,
+    SettingsModule,
   ],
 })
 export class AppModule { }
