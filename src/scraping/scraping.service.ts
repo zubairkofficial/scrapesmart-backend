@@ -4,7 +4,6 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
 import { Repository } from "typeorm";
-import { z } from "zod";
 import { ScrapeSourceInput } from './dto/scraping.dto';
 
 
@@ -23,24 +22,6 @@ function extractNumber(text: string) {
 
 }
 
-const productSchema = z.object({
-  products: z.array(z.object({
-    year: z.number().nullable(),
-    partName: z.string().nullable(),
-    model: z.string().nullable(),
-    description: z.string().nullable(),
-    imageURL: z.string().nullable(),
-    partGrade: z.enum(["A", "B", "C", "X"]).optional().default("X"),
-    price: z.number().nullable(),
-    dealer: z.object({
-      website: z.string().nullable(),
-      address: z.string().nullable(),
-      email: z.string().nullable(),
-      phone: z.string().nullable(),
-    })
-  }))
-});
-
 @Injectable()
 export class ScrapingService {
   constructor(
@@ -48,16 +29,14 @@ export class ScrapingService {
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore,
   ) { }
 
-  private scrapeProducts(address: string, $: chr.CheerioAPI) {
-    if (!URL.canParse(address)) {
-      throw new BadRequestException()
-    }
-    const url = URL.parse(address);
+  private async scrapeProducts(address: URL, $: chr.CheerioAPI) {
+    const url = address;
     const searchParams = url.searchParams;
 
     const products = [];
 
-    const isEngine = searchParams.get("userPart") === "Engine";
+    const co2Div = $('body > center > font > div:nth-child(2)').text();
+    const isEngine = searchParams.get("userPart") === "Engine" || co2Div.indexOf("CO2e") !== -1;
 
     const tableRows = isEngine ? $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(3) tr') : $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(2) tr');
 
@@ -65,13 +44,13 @@ export class ScrapingService {
       miles: null,
       damageCode: null,
       partGrade: null,
-      stockNumber: null,
       price: null,
       dealerInfo: null,
-      distMiles: null,
+      distKM: null,
+      stockID: null
     }
 
-    $(tableRows).each((i, row) => {
+    await Promise.all($(tableRows).map((i, row) => (async (i, row) => {
       const tds = $(row).find('td');
       // if (tds.length !== 7) return;
 
@@ -96,10 +75,6 @@ export class ScrapingService {
             mappedTds['damageCode'] = j;
             return;
           }
-          if (tableHeadText.indexOf("Stock") !== -1) {
-            mappedTds['stockNumber'] = j;
-            return;
-          }
           if (tableHeadText.indexOf("Price") !== -1) {
             mappedTds['price'] = j;
             return;
@@ -109,7 +84,11 @@ export class ScrapingService {
             return;
           }
           if (tableHeadText.indexOf("Dist") !== -1) {
-            mappedTds['distMiles'] = j;
+            mappedTds['distKM'] = j;
+            return;
+          }
+          if (tableHeadText.indexOf("Stock") !== -1) {
+            mappedTds['stockID'] = j;
             return;
           }
         })
@@ -122,7 +101,19 @@ export class ScrapingService {
 
       // Extract description and image
       const descTd = $(tds[1]);
-      const imageURL = descTd.find('img').attr('src') || null;
+      const imageElement = descTd.find('img');
+      const imagePageParams = imageElement.attr("onclick")?.match(/return popupImg\('(.*)'\)/)?.[1] || null;
+      const imagesPage = "https://imageappoh.car-part.com/image?" + imagePageParams;
+
+      const $imagePage = await chr.fromURL(imagesPage);
+      const thumbs = $imagePage('#thumbs a');
+      const images = [];
+      thumbs.each((i, thumb) => {
+        const link = $imagePage(thumb).attr('onclick')?.match(/switchImg\('(.*)'\)/)?.[1] || null;
+        images.push(link);
+      });
+
+      const imageURL = imageElement.attr('src') || null;
       const description = descTd.clone().children().remove().end().text().trim() || null;
 
       // Extract part grade (first character before <br>)
@@ -148,7 +139,6 @@ export class ScrapingService {
         email: null,
         phone: null
       };
-
       if (mappedTds['dealerInfo']) {
         const dealerTd = $(tds[mappedTds['dealerInfo']]);
         dealer.website = dealerTd.find('a').first().attr('href') || null
@@ -176,68 +166,74 @@ export class ScrapingService {
         dealer.phone = phoneMatches?.join(' / ') || null;
       }
 
+      let miles = null;
+      if (mappedTds['miles']) {
+        miles = $(tds[mappedTds['miles']]).text().trim().split("--km--")?.[1] || null;
+      }
+
+      let distKM = null;
+      if (mappedTds['distKM']) {
+        distKM = $(tds[mappedTds['distKM']]).text().trim().split("--km--")?.[1] || null;
+      }
+
+      let stockID = null;
+      if (mappedTds['stockID']) {
+        stockID = $(tds[mappedTds['stockID']]).clone().html().split("<br>")?.[0] || null;
+      }
+
       products.push({
         year,
         partName,
         model,
+        miles,
+        stockID,
+        images,
+        distKM,
         description,
         imageURL,
         partGrade,
         price,
         dealer
       });
-    });
+    })(i, row)));
 
     return products;
   }
 
   async scrapeSource(input: ScrapeSourceInput, user: CurrentUserType) {
     const settings = await this.settingsRepository.find();
-    if (!settings.length) {
+    if (!settings.length || !settings?.[0]?.openAIAPIKey) {
       throw new BadRequestException('Please set OpenAI API Key');
     }
 
-    const pageURLs = [];
+    // const pageURLs = [];
     if (!URL.canParse(input.source)) {
       throw new BadRequestException()
     }
-    const url = URL.parse(input.source);
+    let url = URL.parse(input.source);
     const searchParams = url.searchParams;
-    searchParams.set("userPage", "1");
     const isEngine = searchParams.get("userPart") === "Engine";
-
+    const isZip = searchParams.get("userZip");
+    if (isZip && searchParams.get("userPreference") !== "zip") {
+      url = new URL(url.toString().replace(/userPreference=[^&]+/, "userPreference=zip"));
+    }
 
     const $ = await chr.fromURL(url)
 
-    // body > center > font > div:nth-child(5) > table
     const totalPages = extractNumber(
       isEngine ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
-
-    pageURLs.push(url.toString());
-    const products = this.scrapeProducts(input.source, $);
-
-    const productPromises = [];
-    if (typeof totalPages == "number") {
-      for (let i = 2; i <= totalPages; i++) {
-        searchParams.set("userPage", i.toString());
-        productPromises.push(new Promise(async (resolve, reject) => {
-          try {
-            const $ = await chr.fromURL(url)
-            products.push(...this.scrapeProducts(url.toString(), $));
-            resolve(0);
-          } catch (e) {
-            reject(e);
-          }
-        }))
-      }
+    if (totalPages) {
+      searchParams.set("userPage", "1");
     }
 
-    await Promise.all(productPromises);
+    // pageURLs.push(url.toString());
+    const products = await this.scrapeProducts(url, $);
 
     const documents = products.map((product) => ({
       pageContent: JSON.stringify(product),
       metadata: {
         source: input.source,
+        product,
         user: user.ID,
         createdAt: new Date(),
       }

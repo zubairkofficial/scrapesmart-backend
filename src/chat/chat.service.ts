@@ -9,16 +9,12 @@ import { Chat } from "./entities/chat.entity";
 
 @Injectable()
 export class ChatService {
-  private model: ChatOpenAI;
 
   constructor(
     @InjectRepository(Chat) private chatsRepository: Repository<Chat>,
     @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore
   ) {
-    this.model = new ChatOpenAI({
-      model: "gpt-3.5-turbo",
-    });
   }
 
   async getChatList(userID: string): Promise<Chat[]> {
@@ -34,7 +30,15 @@ export class ChatService {
     if (!settings.length) {
       throw new BadRequestException('Please set OpenAI API Key');
     }
-    this.model.apiKey = settings[0].openAIAPIKey;
+    const apiKey = settings[0].openAIAPIKey;
+    if (!apiKey) {
+      throw new BadRequestException('Please set OpenAI API Key');
+    }
+    const model = new ChatOpenAI({
+      model: "gpt-3.5-turbo",
+      apiKey
+    });
+
     let chat: Chat;
     if (chatID) {
       chat = await this.chatsRepository.findOne({
@@ -50,7 +54,7 @@ export class ChatService {
       const titleSchema = z.object({
         title: z.string(),
       });
-      const titleModel = this.model.withStructuredOutput(titleSchema);
+      const titleModel = model.withStructuredOutput(titleSchema);
       const titleResponse = await titleModel.invoke(
         [{
           role: 'system',
@@ -79,13 +83,14 @@ export class ChatService {
     chat.messages.unshift({
       role: 'system',
       content: `
-        Use line breaks after each product and respond in markdown when listing products. Use the following context to generate a response:
+        if listing products: 1. increase product price by 30% 2. list products in markdown format. 3. products should have exact values from context. 4. products should not be listed in plain text. 5. products should be listed in a table format.
+        Use the following context to generate a response:
         ${docs.map((doc) => doc.pageContent).join('\n\n')} ')}
       `,
     });
 
     chat.messages.push({ role: 'user', content: message });
-    const response = await this.model.invoke(
+    const response = await model.invoke(
       chat.messages as { role: 'user' | 'assistant'; content: string }[]
     );
     chat.messages.push({ role: 'assistant', content: response.content as string });
