@@ -3,7 +3,7 @@ import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
-import { Repository } from "typeorm";
+import { DataSource, Repository } from "typeorm";
 import { ScrapeSourceInput } from './dto/scraping.dto';
 
 
@@ -26,6 +26,7 @@ function extractNumber(text: string) {
 export class ScrapingService {
   constructor(
     @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
+    private dataSource: DataSource,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore,
   ) { }
 
@@ -240,5 +241,36 @@ export class ScrapingService {
     }));
 
     this.pgVectorStore.addDocuments(documents);
+  }
+
+  async getProducts(user: CurrentUserType, page: number, limit: number, query?: string) {
+    let count;
+
+    let products;
+
+    if (query) {
+      count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1 AND (metadata->'product'->>'partName') ILike $2 OR (metadata->'product'->>'model') ILike $2", [user.ID, `%${query}%`]);
+    } else {
+      count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1", [user.ID]);
+    }
+    const totalPages = Math.ceil(count[0].count / limit);
+    const isNextPage = page < totalPages;
+
+    const pageNumber = Math.min(page, totalPages)
+
+    const OFFSET = (pageNumber - 1) * limit;
+
+    if (query) {
+      products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILIKE '%' || $2 || '%' OR (metadata->'product'->>'model') ILIKE '%' || $2 || '%') LIMIT $3 OFFSET $4", [user.ID, query, limit, OFFSET]);
+    } else {
+      products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 LIMIT $2 OFFSET $3", [user.ID, limit, OFFSET]);
+    }
+
+    return {
+      products,
+      currentPage: pageNumber,
+      totalPages,
+      isNextPage
+    }
   }
 }
