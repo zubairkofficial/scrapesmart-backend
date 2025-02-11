@@ -12,14 +12,15 @@ function extractNumber(text: string) {
   // - Optional negative sign
   // - Digits (with optional commas between)
   // - Optional decimal point and digits
+  if (typeof text !== "string") return null;
+
   const regex = /-?(?:(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)/g;
 
   const matches = text.match(regex);
   if (!matches) return null;
 
   const numbers = matches.map(num => parseFloat(num.replace(/,/g, '')));
-  return numbers.length > 0 ? numbers[0] : null;
-
+  return numbers.length > 0 ? Number(Number(numbers[0]).toFixed(2)) : null;
 }
 
 @Injectable()
@@ -266,8 +267,22 @@ export class ScrapingService {
       products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 LIMIT $2 OFFSET $3", [user.ID, limit, OFFSET]);
     }
 
+    const productsWithUpdatedPrice = products.map((product) => {
+      const price = extractNumber(product.metadata.product.price);
+      const isNumber = typeof price === 'number';
+      return {
+        metadata: {
+          ...product.metadata,
+          product: {
+            ...product.metadata.product,
+            price: isNumber ? `$${price * 1.3}` : product.metadata.product.price
+          }
+        }
+      }
+    })
+
     return {
-      products,
+      products: productsWithUpdatedPrice,
       currentPage: pageNumber,
       totalPages,
       isNextPage
