@@ -298,7 +298,7 @@ export class ScrapingService {
           ...product.metadata,
           product: {
             ...product.metadata.product,
-            price: isNumber ? `$${price * 1.3}` : product.metadata.product.price
+            price: isNumber ? `$${Number(price * 1.3).toFixed(2)}` : product.metadata.product.price
           }
         }
       }
