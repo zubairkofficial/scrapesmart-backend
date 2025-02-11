@@ -4,8 +4,8 @@ import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
 import { DataSource, Repository } from "typeorm";
-import { ScrapeSourceInput } from './dto/scraping.dto';
-
+import { AutoPartService } from "./auto-part.service";
+import { ScrapeInput, ScrapeSourceInput } from './dto/scraping.dto';
 
 function extractNumber(text: string) {
   // Matches:
@@ -28,19 +28,18 @@ export class ScrapingService {
   constructor(
     @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     private dataSource: DataSource,
+    private autoPartAPI: AutoPartService,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore,
   ) { }
 
-  private async scrapeProducts(address: URL, $: chr.CheerioAPI) {
-    const url = address;
-    const searchParams = url.searchParams;
-
+  private async scrapeProducts(secondLayout: boolean, $: chr.CheerioAPI) {
     const products = [];
 
-    const co2Div = $('body > center > font > div:nth-child(2)').text();
-    const isEngine = searchParams.get("userPart") === "Engine" || co2Div.indexOf("CO2e") !== -1;
+    const tableRows = secondLayout ? $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(3) tr') : $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(2) tr');
 
-    const tableRows = isEngine ? $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(3) tr') : $('body > center:nth-child(4) > font:nth-child(1) > table:nth-child(2) tr');
+    if (tableRows.length === 0) {
+      return products;
+    }
 
     const mappedTds: Record<string, number | null> = {
       miles: null,
@@ -202,6 +201,20 @@ export class ScrapingService {
     return products;
   }
 
+  private async addProductsToStore(source, user, products) {
+    const documents = products.map((product) => ({
+      pageContent: JSON.stringify(product),
+      metadata: {
+        source,
+        product,
+        user: user.ID,
+        createdAt: new Date(),
+      }
+    }));
+
+    this.pgVectorStore.addDocuments(documents);
+  }
+
   async scrapeSource(input: ScrapeSourceInput, user: CurrentUserType) {
     const settings = await this.settingsRepository.find();
     if (!settings.length || !settings?.[0]?.openAIAPIKey) {
@@ -213,35 +226,45 @@ export class ScrapingService {
       throw new BadRequestException()
     }
     let url = URL.parse(input.source);
+
     const searchParams = url.searchParams;
-    const isEngine = searchParams.get("userPart") === "Engine";
+
     const isZip = searchParams.get("userZip");
     if (isZip && searchParams.get("userPreference") !== "zip") {
       url = new URL(url.toString().replace(/userPreference=[^&]+/, "userPreference=zip"));
     }
 
-    const $ = await chr.fromURL(url)
+    const $ = await chr.fromURL(url);
+
+    const co2Div = $('body > center > font > div:nth-child(2)').text();
+    const isSecondLayout = co2Div.indexOf("CO2e") !== -1;
 
     const totalPages = extractNumber(
-      isEngine ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
+      isSecondLayout ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
     if (totalPages) {
       searchParams.set("userPage", "1");
     }
 
-    // pageURLs.push(url.toString());
-    const products = await this.scrapeProducts(url, $);
+    const products = await this.scrapeProducts(isSecondLayout, $);
 
-    const documents = products.map((product) => ({
-      pageContent: JSON.stringify(product),
-      metadata: {
-        source: input.source,
-        product,
-        user: user.ID,
-        createdAt: new Date(),
-      }
-    }));
+    await this.addProductsToStore(input.source, user, products);
 
-    this.pgVectorStore.addDocuments(documents);
+    return products.length;
+  }
+
+  async scrape(input: ScrapeInput, user: CurrentUserType) {
+    const page = await this.autoPartAPI.getProductsPage(input);
+
+    const $ = chr.load(page.data);
+
+    const co2Div = $('body > center > font > div:nth-child(2)').text();
+    const isSecondLayout = input.partName == "Engine" || co2Div.indexOf("CO2e") !== -1;
+
+    const products = await this.scrapeProducts(isSecondLayout, $);
+
+    await this.addProductsToStore(page.config.url, user, products);
+
+    return products.length;
   }
 
   async getProducts(user: CurrentUserType, page: number, limit: number, query?: string) {

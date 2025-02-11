@@ -1,8 +1,8 @@
-import { AuthGuard } from '@/auth/guards/auth.guard';
+import { AuthGuard } from "@/auth/guards/auth.guard";
 import { CurrentUser } from '@/common/decorators/currentUser.decorator';
 import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBearerAuth } from '@nestjs/swagger';
-import { ScrapeSourceInput } from './dto/scraping.dto';
+import { ApiBearerAuth } from "@nestjs/swagger";
+import { ScrapeInput, ScrapeSourceInput } from './dto/scraping.dto';
 import { ScrapingService } from './scraping.service';
 
 @ApiBearerAuth('access-token')
@@ -13,7 +13,18 @@ export class ScrapingController {
 
   @Post()
   async scrapeSource(@Body() input: ScrapeSourceInput, @CurrentUser() user: CurrentUserType) {
-    await this.scrapingService.scrapeSource(input, user);
+    const numOfProducts = await this.scrapingService.scrapeSource(input, user);
+    return {
+      products: numOfProducts,
+    };
+  }
+
+  @Post('/form')
+  async scrape(@Body() input: ScrapeInput, @CurrentUser() user: CurrentUserType) {
+    const numOfProducts = await this.scrapingService.scrape(input, user);
+    return {
+      products: numOfProducts,
+    };
   }
 
   @Get("list")
