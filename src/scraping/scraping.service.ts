@@ -105,16 +105,18 @@ export class ScrapingService {
       const imageElement = descTd.find('img');
       const imagePageParams = imageElement.attr("onclick")?.match(/return popupImg\('(.*)'\)/)?.[1] || null;
       const imagesPage = "https://imageappoh.car-part.com/image?" + imagePageParams;
-
-      const $imagePage = await chr.fromURL(imagesPage);
-      const thumbs = $imagePage('#thumbs a');
+      const isImagesPageValid = URL.canParse(imagesPage);
       const images = [];
-      thumbs.each((i, thumb) => {
-        const link = $imagePage(thumb).attr('onclick')?.match(/switchImg\('(.*)'\)/)?.[1] || null;
-        images.push(link);
-      });
 
-      const imageURL = imageElement.attr('src') || null;
+      if (isImagesPageValid) {
+        const $imagePage = await chr.fromURL(imagesPage);
+        const thumbs = $imagePage('#thumbs a');
+        thumbs.each((i, thumb) => {
+          const link = $imagePage(thumb).attr('onclick')?.match(/switchImg\('(.*)'\)/)?.[1] || null;
+          images.push(link);
+        });
+      }
+
       const description = descTd.clone().children().remove().end().text().trim() || null;
 
       // Extract part grade (first character before <br>)
@@ -191,7 +193,7 @@ export class ScrapingService {
         images,
         distKM,
         description,
-        imageURL,
+        imageURL: isImagesPageValid ? imagesPage : null,
         partGrade,
         price,
         dealer
@@ -245,14 +247,26 @@ export class ScrapingService {
       searchParams.set("userPage", "1");
     }
 
-    const products = await this.scrapeProducts(isSecondLayout, $);
+    const products = [];
+
+    const promises = [];
+    for (let i = 1; i <= totalPages; i++) {
+      promises.push((async () => {
+        const url = new URL(input.source);
+        url.searchParams.set("userPage", i.toString());
+        const page = await chr.fromURL(url);
+        const pageProducts = await this.scrapeProducts(isSecondLayout, page);
+        products.push(...pageProducts);
+      })());
+    }
+    await Promise.allSettled(promises);
 
     await this.addProductsToStore(input.source, user, products);
 
     return products.length;
   }
 
-  async scrape(input: ScrapeInput, user: CurrentUserType) {
+  async scrapeForm(input: ScrapeInput, user: CurrentUserType) {
     const page = await this.autoPartAPI.getProductsPage(input);
 
     const $ = chr.load(page.data);
@@ -262,6 +276,28 @@ export class ScrapingService {
 
     const products = await this.scrapeProducts(isSecondLayout, $);
 
+    const totalPages = extractNumber(
+      isSecondLayout ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
+
+    const promises = [];
+    if (totalPages) {
+      for (let i = 2; i <= totalPages; i++) {
+        promises.push((async () => {
+          const params = JSON.parse(JSON.stringify(input));
+          // add user page to params
+          params["userPage"] = i;
+
+          const nextPage = await this.autoPartAPI.getProductsPage(params);
+
+          const $nextPage = chr.load(nextPage.data);
+          const nextPageProducts = await this.scrapeProducts(isSecondLayout, $nextPage);
+
+          products.push(...nextPageProducts);
+        })());
+      }
+    }
+
+    await Promise.allSettled(promises);
     await this.addProductsToStore(page.config.url, user, products);
 
     return products.length;

@@ -21,7 +21,7 @@ export class ScrapingController {
 
   @Post('/form')
   async scrape(@Body() input: ScrapeInput, @CurrentUser() user: CurrentUserType) {
-    const numOfProducts = await this.scrapingService.scrape(input, user);
+    const numOfProducts = await this.scrapingService.scrapeForm(input, user);
     return {
       products: numOfProducts,
     };
