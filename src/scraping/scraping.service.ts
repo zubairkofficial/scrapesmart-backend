@@ -269,7 +269,6 @@ export class ScrapingService {
 
   async getProducts(user: CurrentUserType, page: number, limit: number, query?: string) {
     let count;
-
     let products;
 
     if (query) {
@@ -277,12 +276,14 @@ export class ScrapingService {
     } else {
       count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1", [user.ID]);
     }
+
     const totalPages = Math.ceil(count[0].count / limit);
+
     const isNextPage = page < totalPages;
 
     const pageNumber = Math.min(page, totalPages)
 
-    const OFFSET = (pageNumber - 1) * limit;
+    const OFFSET = Math.max((pageNumber - 1) * limit, 0);
 
     if (query) {
       products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILIKE '%' || $2 || '%' OR (metadata->'product'->>'model') ILIKE '%' || $2 || '%') LIMIT $3 OFFSET $4", [user.ID, query, limit, OFFSET]);
@@ -293,6 +294,7 @@ export class ScrapingService {
     const productsWithUpdatedPrice = products.map((product) => {
       const price = extractNumber(product.metadata.product.price);
       const isNumber = typeof price === 'number';
+
       return {
         metadata: {
           ...product.metadata,
