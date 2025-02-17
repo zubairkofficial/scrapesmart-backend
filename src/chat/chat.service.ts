@@ -3,6 +3,7 @@ import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { ChatOpenAI } from "@langchain/openai";
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
+import { Observable } from "rxjs";
 import { Repository } from "typeorm";
 import { z } from "zod";
 import { Chat } from "./entities/chat.entity";
@@ -25,7 +26,7 @@ export class ChatService {
     });
   }
 
-  async chat(message: string, userID: string, chatID?: string): Promise<string> {
+  async chat(message: string, userID: string, chatID?: string) {
     const settings = await this.settingsRepository.find();
     if (!settings.length) {
       throw new BadRequestException('Please set OpenAI API Key');
@@ -90,15 +91,37 @@ export class ChatService {
     });
 
     chat.messages.push({ role: 'user', content: message });
-    const response = await model.invoke(
-      chat.messages as { role: 'user' | 'assistant'; content: string }[]
-    );
-    chat.messages.push({ role: 'assistant', content: response.content as string });
 
-    chat.messages.shift()
+    return new Observable((subscriber) => {
+      (async () => {
+        try {
+          const response = await model.stream(
+            chat.messages as { role: 'user' | 'assistant'; content: string }[]
+          );
 
-    await this.chatsRepository.save(chat);
-    return chatID;
+          let fullMsg = "";
+
+          for await (const message of response) {
+            subscriber.next({
+              data: { content: message.content }
+            } as MessageEvent);
+            fullMsg += message.content;
+          }
+
+          chat.messages.push({ role: 'assistant', content: fullMsg });
+          chat.messages.shift()
+          await this.chatsRepository.save(chat);
+
+          // Send end event and complete the stream
+          subscriber.next({
+            data: { type: 'end' }
+          } as MessageEvent);
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
   }
 
   async getChatInfo(userID: string, chatID: string): Promise<Chat> {
