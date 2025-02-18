@@ -249,17 +249,24 @@ export class ScrapingService {
 
     const products = [];
 
-    const promises = [];
-    for (let i = 1; i <= totalPages; i++) {
-      promises.push((async () => {
+    const getPage = async (pageNum: number) => {
         const url = new URL(input.source);
-        url.searchParams.set("userPage", i.toString());
+      url.searchParams.set("userPage", pageNum.toString());
         const page = await chr.fromURL(url);
         const pageProducts = await this.scrapeProducts(isSecondLayout, page);
         products.push(...pageProducts);
-      })());
+    }
+
+    if (totalPages) {
+      const promises = [];
+      for (let i = 1; i <= totalPages; i++) {
+        promises.push(getPage(i));
     }
     await Promise.allSettled(promises);
+    } else {
+      // There's only first page.
+      await getPage(1);
+    }
 
     await this.addProductsToStore(input.source, user, products);
 
