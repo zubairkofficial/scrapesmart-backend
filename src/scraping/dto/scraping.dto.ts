@@ -58,4 +58,12 @@ export class ScrapeInput {
   @IsOptional()
   @IsString()
   zipCode: string;
+
+  @ApiProperty({
+    example: 'interchange',
+    description: 'Interchange search'
+  })
+  @IsOptional()
+  @IsString()
+  interchange?: string;
 }

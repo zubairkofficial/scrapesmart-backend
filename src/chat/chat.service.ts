@@ -10,13 +10,11 @@ import { Chat } from "./entities/chat.entity";
 
 @Injectable()
 export class ChatService {
-
   constructor(
     @InjectRepository(Chat) private chatsRepository: Repository<Chat>,
     @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore
-  ) {
-  }
+  ) { }
 
   async getChatList(userID: string): Promise<Chat[]> {
     return this.chatsRepository.find({
@@ -31,12 +29,19 @@ export class ChatService {
     if (!settings.length) {
       throw new BadRequestException('Please set OpenAI API Key');
     }
+
     const apiKey = settings[0].openAIAPIKey;
     if (!apiKey) {
       throw new BadRequestException('Please set OpenAI API Key');
     }
+
+    const modelID = settings[0].model;
+    if (!modelID) {
+      throw new BadRequestException('Please set OpenAI Model ID in settings');
+    }
+
     const model = new ChatOpenAI({
-      model: "gpt-3.5-turbo",
+      model: modelID,
       apiKey
     });
 
@@ -84,7 +89,7 @@ export class ChatService {
     chat.messages.unshift({
       role: 'system',
       content: `
-        if listing products: 1. increase product price by 30% 2. list products in markdown format. 3. products should have exact values from context. 4. products should not be listed in plain text. 5. products should be listed in a table format.
+        if listing products: 1. increase product price by 30% 2. response should be in markdown not wrapped in markdown code block. 3. products should have exact values from context. 4. products should not be listed in plain text. 5. products should be listed in a table format. 6. don't respond to any other queries beside the context.
         Use the following context to generate a response:
         ${docs.map((doc) => doc.pageContent).join('\n\n')} ')}
       `,

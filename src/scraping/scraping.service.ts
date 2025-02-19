@@ -3,9 +3,11 @@ import { PGVectorStore } from "@langchain/community/vectorstores/pgvector";
 import { BadRequestException, Inject, Injectable } from '@nestjs/common';
 import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
+import { Observable } from "rxjs";
 import { DataSource, Repository } from "typeorm";
 import { AutoPartService } from "./auto-part.service";
 import { ScrapeInput, ScrapeSourceInput } from './dto/scraping.dto';
+import { ShopifyService } from "./shopify.service";
 
 function extractNumber(text: string) {
   // Matches:
@@ -29,6 +31,7 @@ export class ScrapingService {
     @InjectRepository(Settings) private settingsRepository: Repository<Settings>,
     private dataSource: DataSource,
     private autoPartAPI: AutoPartService,
+    private shopifyAPI: ShopifyService,
     @Inject('PGVectorStore') private pgVectorStore: PGVectorStore,
   ) { }
 
@@ -200,6 +203,8 @@ export class ScrapingService {
       });
     })(i, row)));
 
+    // await this.shopifyAPI.createProducts(products);
+
     return products;
   }
 
@@ -234,6 +239,10 @@ export class ScrapingService {
       throw new BadRequestException("Invalid URL");
     }
 
+    if (!url.pathname.startsWith("/cgi-bin/search.cgi")) {
+      throw new BadRequestException("Please provide a valid product list URL");
+    }
+
     const searchParams = url.searchParams;
 
     const isZip = searchParams.get("userZip");
@@ -241,7 +250,12 @@ export class ScrapingService {
       url = new URL(url.toString().replace(/userPreference=[^&]+/, "userPreference=zip"));
     }
 
-    const $ = await chr.fromURL(url);
+    const $ = await chr.fromURL(url, {
+      requestOptions: {
+        method: "GET",
+        bodyTimeout: 50000,
+      }
+    });
 
     const co2Div = $('body > center > font > div:nth-child(2)').text();
     const isSecondLayout = co2Div.indexOf("CO2e") !== -1;
@@ -255,19 +269,24 @@ export class ScrapingService {
     const products = [];
 
     const getPage = async (pageNum: number) => {
-        const url = new URL(input.source);
+      const url = new URL(input.source);
       url.searchParams.set("userPage", pageNum.toString());
-        const page = await chr.fromURL(url);
-        const pageProducts = await this.scrapeProducts(isSecondLayout, page);
-        products.push(...pageProducts);
+      const page = await chr.fromURL(url, {
+        requestOptions: {
+          method: "GET",
+          bodyTimeout: 50000,
+        }
+      });
+      const pageProducts = await this.scrapeProducts(isSecondLayout, page);
+      products.push(...pageProducts);
     }
 
     if (totalPages) {
       const promises = [];
       for (let i = 1; i <= totalPages; i++) {
         promises.push(getPage(i));
-    }
-    await Promise.allSettled(promises);
+      }
+      await Promise.allSettled(promises);
     } else {
       // There's only first page.
       await getPage(1);
@@ -315,33 +334,63 @@ export class ScrapingService {
     const co2Div = $('body > center > font > div:nth-child(2)').text();
     const isSecondLayout = input.partName == "Engine" || co2Div.indexOf("CO2e") !== -1;
 
-    const products = await this.scrapeProducts(isSecondLayout, $);
+    const isTempBlocked = $("body > div:nth-child(3) > table > tbody > tr:nth-child(2) > td > b").text().trim().includes("temporarily unavailable");
 
     const totalPages = extractNumber(
       isSecondLayout ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
 
-    const promises = [];
-    if (totalPages) {
-      for (let i = 2; i <= totalPages; i++) {
-        promises.push((async () => {
-          const params = JSON.parse(JSON.stringify(input));
-          // add user page to params
-          params["userPage"] = i;
+    const products = [];
 
-          const nextPage = await this.autoPartAPI.getProductsPage(params);
+    return new Observable((subscriber) => {
+      (async () => {
+        try {
+          if (isTempBlocked) {
+            subscriber.error("Temporarily blocked");
+            return;
+          }
 
-          const $nextPage = chr.load(nextPage.data);
-          const nextPageProducts = await this.scrapeProducts(isSecondLayout, $nextPage);
+          const firstPageProducts = await this.scrapeProducts(isSecondLayout, $);
+          products.push(...firstPageProducts);
+          subscriber.next({
+            data: {
+              current: 1,
+              total: totalPages
+            }
+          });
 
-          products.push(...nextPageProducts);
-        })());
-      }
-    }
+          if (totalPages) {
+            for (let i = 2; i <= totalPages; i++) {
+              const params = JSON.parse(JSON.stringify(input));
+              // add user page to params
+              params["userPage"] = i;
+              try {
+                await (async () => {
+                  const nextPage = await this.autoPartAPI.getProductsPage(params);
 
-    await Promise.allSettled(promises);
-    await this.addProductsToStore(page.config.url, user, products);
+                  const $nextPage = chr.load(nextPage.data);
+                  const nextPageProducts = await this.scrapeProducts(isSecondLayout, $nextPage);
 
-    return products.length;
+                  products.push(...nextPageProducts);
+                })();
+                subscriber.next({
+                  data: {
+                    current: i,
+                    total: totalPages
+                  }
+                });
+              } catch { }
+            }
+          }
+          await this.addProductsToStore(page.config.url, user, products);
+          subscriber.next({
+            data: { type: 'end', totalProduct: products.length }
+          });
+          subscriber.complete();
+        } catch (error) {
+          subscriber.error(error);
+        }
+      })();
+    });
   }
 
   async getProducts(user: CurrentUserType, page: number, limit: number, query?: string) {

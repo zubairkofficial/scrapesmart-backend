@@ -5,10 +5,11 @@ import { PGVectorStoreProvider } from "../common/providers/pg-vector-store.provi
 import { AutoPartService } from "./auto-part.service";
 import { ScrapingController } from './scraping.controller';
 import { ScrapingService } from './scraping.service';
+import { ShopifyService } from "./shopify.service";
 
 @Module({
   imports: [TypeOrmModule.forFeature([Settings])],
   controllers: [ScrapingController],
-  providers: [ScrapingService, AutoPartService, PGVectorStoreProvider],
+  providers: [ScrapingService, AutoPartService, PGVectorStoreProvider, ShopifyService],
 })
 export class ScrapingModule { }

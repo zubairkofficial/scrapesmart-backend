@@ -11,4 +11,9 @@ export class CreateSettingsDto {
   @IsOptional()
   @ApiProperty()
   adAccountID?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty()
+  model?: string;
 }

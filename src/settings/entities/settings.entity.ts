@@ -8,4 +8,7 @@ export class Settings extends EntityBase {
 
   @Column({ type: "varchar", length: 255, default: "" })
   adAccountID: string;
+
+  @Column({ type: "varchar", length: 255, default: "" })
+  model: string;
 }

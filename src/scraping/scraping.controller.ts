@@ -1,6 +1,6 @@
 import { AuthGuard } from "@/auth/guards/auth.guard";
 import { CurrentUser } from '@/common/decorators/currentUser.decorator';
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Sse, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { ScrapeInput, ScrapeSourceInput } from './dto/scraping.dto';
 import { ScrapingService } from './scraping.service';
@@ -19,12 +19,16 @@ export class ScrapingController {
     };
   }
 
-  @Post('/form')
-  async scrape(@Body() input: ScrapeInput, @CurrentUser() user: CurrentUserType) {
+  @Sse('/form')
+  async scrape(@Query() input: ScrapeInput, @CurrentUser() user: CurrentUserType) {
     const numOfProducts = await this.scrapingService.scrapeForm(input, user);
-    return {
-      products: numOfProducts,
-    };
+    return numOfProducts;
+  }
+
+  @Post('/check-inter')
+  async checkInter(@Body() input: ScrapeInput, @CurrentUser() user: CurrentUserType) {
+    const options = await this.scrapingService.checkInterchange(input);
+    return options;
   }
 
   @Get("list")
