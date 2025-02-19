@@ -223,11 +223,16 @@ export class ScrapingService {
       throw new BadRequestException('Please set OpenAI API Key');
     }
 
-    // const pageURLs = [];
     if (!URL.canParse(input.source)) {
       throw new BadRequestException()
     }
+
     let url = URL.parse(input.source);
+
+    const validURLs = ["www.car-part.com", "car-part.com"];
+    if (!validURLs.includes(url.host)) {
+      throw new BadRequestException("Invalid URL");
+    }
 
     const searchParams = url.searchParams;
 
@@ -271,6 +276,35 @@ export class ScrapingService {
     await this.addProductsToStore(input.source, user, products);
 
     return products.length;
+  }
+
+  async checkInterchange(input: ScrapeInput) {
+    const page = await this.autoPartAPI.getInterchange(input);
+
+    const $ = chr.load(page.data);
+
+    const interchangeChoices = $("#MainForm > table > tbody > tr > td > table > tbody > tr > td");
+
+    if (interchangeChoices.length) {
+      const intContainer = $(interchangeChoices[0]);
+      const options = intContainer.find("input:not(input[type='hidden'])");
+      const intValues = [];
+      options.map((i, option) => {
+        intValues.push($(option).attr('value'));
+      });
+
+      const labels = intContainer.find("label");
+      const intLabels = []
+      labels.map((i, label) => {
+        intLabels.push($(label).text());
+      });
+
+      return {
+        interchangeValues: intValues,
+        interchangeLabels: intLabels
+      };
+    }
+
   }
 
   async scrapeForm(input: ScrapeInput, user: CurrentUserType) {
