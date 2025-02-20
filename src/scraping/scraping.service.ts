@@ -334,7 +334,7 @@ export class ScrapingService {
     const co2Div = $('body > center > font > div:nth-child(2)').text();
     const isSecondLayout = input.partName == "Engine" || co2Div.indexOf("CO2e") !== -1;
 
-    const isTempBlocked = $("body > div:nth-child(3) > table > tbody > tr:nth-child(2) > td > b").text().trim().includes("temporarily unavailable");
+    const isTempBlocked = $("body").text().trim().includes("temporarily unavailable");
 
     const totalPages = extractNumber(
       isSecondLayout ? $("body > center > font > div:nth-child(5) > table > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim() : $("body > center:nth-child(4) > font:nth-child(1) > div:nth-child(4) > table:nth-child(3) > tbody:nth-child(1) > tr:last-child > td:last-child").text().trim());
@@ -387,7 +387,7 @@ export class ScrapingService {
           });
           subscriber.complete();
         } catch (error) {
-          subscriber.error(error);
+          subscriber.error("A problem occurred while scraping the page.");
         }
       })();
     });
