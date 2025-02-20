@@ -28,7 +28,7 @@ export class AutoPartService {
       userInterchange: "None",
       userPreference: data.sortBy,
       userZip: data.zipCode,
-      userDate1: "1900",
+      userDate: "1900",
       userDate2: data.year,
     });
 

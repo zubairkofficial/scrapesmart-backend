@@ -398,7 +398,7 @@ export class ScrapingService {
     let products;
 
     if (query) {
-      count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1 AND (metadata->'product'->>'partName') ILike $2 OR (metadata->'product'->>'model') ILike $2", [user.ID, `%${query}%`]);
+      count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILike $2 OR (metadata->'product'->>'model') ILike $2 OR (metadata->'product'->'dealer'->>'email') ILike $2)", [user.ID, `%${query}%`]);
     } else {
       count = await this.dataSource.query("SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1", [user.ID]);
     }
@@ -412,7 +412,7 @@ export class ScrapingService {
     const OFFSET = Math.max((pageNumber - 1) * limit, 0);
 
     if (query) {
-      products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILIKE '%' || $2 || '%' OR (metadata->'product'->>'model') ILIKE '%' || $2 || '%') LIMIT $3 OFFSET $4", [user.ID, query, limit, OFFSET]);
+      products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILIKE $2 OR (metadata->'product'->>'model') ILIKE $2 OR (metadata->'product'->'dealer'->>'email') ILIKE $2) LIMIT $3 OFFSET $4", [user.ID, `%${query}%`, limit, OFFSET]);
     } else {
       products = await this.dataSource.query("SELECT metadata FROM scraping_vector_store WHERE metadata->>'user' = $1 LIMIT $2 OFFSET $3", [user.ID, limit, OFFSET]);
     }
