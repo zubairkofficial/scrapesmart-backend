@@ -12,7 +12,7 @@ export const PGVectorStoreProvider: Provider = {
   provide: 'PGVectorStore',
   useFactory: async (configService: ConfigService, dataSource: DataSource) => {
     const result = await dataSource.query(
-      `SELECT * FROM settings`
+      `SELECT * FROM settings LIMIT 1`
     );
 
     const apiKey = result?.[0]?.openAIAPIKey;
@@ -20,6 +20,7 @@ export const PGVectorStoreProvider: Provider = {
       model: "text-embedding-3-small",
       apiKey
     });
+
     const config = {
       postgresConnectionOptions: {
         type: "postgres",
@@ -39,6 +40,7 @@ export const PGVectorStoreProvider: Provider = {
       // supported distance strategies: cosine (default), innerProduct, or euclidean
       distanceStrategy: "cosine" as DistanceStrategy,
     };
+
     return await PGVectorStore.initialize(embeddings, config);
   },
   inject: [ConfigService, DataSource],
