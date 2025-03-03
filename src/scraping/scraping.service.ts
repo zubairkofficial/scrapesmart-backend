@@ -370,13 +370,25 @@ export class ScrapingService {
             });
           }
 
-          await woocommerceAPI.createProducts(products, subscriber);
+          if (
+            settings.siteURL &&
+            settings.consumerKey &&
+            settings.consumerSecret
+          ) {
+            await woocommerceAPI.createProducts(products, subscriber);
+          }
           await this.addProductsToStore(input.source, user, products);
           subscriber.next({
             data: { type: "end", totalProduct: products.length },
           });
           subscriber.complete();
         } catch (error) {
+          subscriber.next({
+            data: {
+              type: "error",
+              message: error.message,
+            },
+          });
           subscriber.error("A problem occurred while scraping the page.");
         }
       })();
@@ -510,13 +522,25 @@ export class ScrapingService {
             settings?.[0].consumerKey,
             settings?.[0].consumerSecret,
           );
-          await woocommerceAPI.createProducts(products, subscriber);
+          if (
+            settings?.[0].siteURL &&
+            settings?.[0].consumerKey &&
+            settings?.[0].consumerSecret
+          ) {
+            await woocommerceAPI.createProducts(products, subscriber);
+          }
 
           subscriber.next({
             data: { type: "end", totalProduct: products.length },
           });
           subscriber.complete();
         } catch (error) {
+          subscriber.next({
+            data: {
+              type: "error",
+              message: error.message,
+            },
+          });
           subscriber.error("A problem occurred while scraping the page.");
         }
       })();
