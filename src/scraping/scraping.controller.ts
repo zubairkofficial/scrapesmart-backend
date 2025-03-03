@@ -10,6 +10,7 @@ import {
   UseGuards,
 } from "@nestjs/common";
 import { ApiBearerAuth } from "@nestjs/swagger";
+import { Observable } from "rxjs";
 import { ScrapeInput, ScrapeSourceInput } from "./dto/scraping.dto";
 import { ScrapingService } from "./scraping.service";
 
@@ -24,11 +25,23 @@ export class ScrapingController {
     @Query() input: ScrapeSourceInput,
     @CurrentUser() user: CurrentUserType,
   ) {
-    const productsObservable = await this.scrapingService.scrapeSource(
-      input,
-      user,
-    );
-    return productsObservable;
+    try {
+      const productsObservable = await this.scrapingService.scrapeSource(
+        input,
+        user,
+      );
+      return productsObservable;
+    } catch (error) {
+      return new Observable((observer) => {
+        observer.next({
+          data: {
+            type: "error",
+            message: error.message,
+          },
+        });
+        observer.error(error);
+      });
+    }
   }
 
   @Sse("/form")
@@ -36,11 +49,23 @@ export class ScrapingController {
     @Query() input: ScrapeInput,
     @CurrentUser() user: CurrentUserType,
   ) {
-    const productsObservable = await this.scrapingService.scrapeForm(
-      input,
-      user,
-    );
-    return productsObservable;
+    try {
+      const productsObservable = await this.scrapingService.scrapeForm(
+        input,
+        user,
+      );
+      return productsObservable;
+    } catch (error) {
+      return new Observable((observer) => {
+        observer.next({
+          data: {
+            type: "error",
+            message: error.message,
+          },
+        });
+        observer.error(error);
+      });
+    }
   }
 
   @Post("/check-inter")

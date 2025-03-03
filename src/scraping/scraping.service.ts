@@ -269,11 +269,11 @@ export class ScrapingService {
       },
     });
     if (!settings || !settings?.openAIAPIKey) {
-      throw new BadRequestException("Please set OpenAI API Key");
+      throw new Error("Please set OpenAI API Key");
     }
 
     if (!URL.canParse(input.source)) {
-      throw new BadRequestException();
+      throw new Error("Invalid URL");
     }
 
     let url = URL.parse(input.source);
@@ -422,7 +422,7 @@ export class ScrapingService {
       },
     });
     if (!settings.length || !settings?.[0]?.openAIAPIKey) {
-      throw new BadRequestException("Please set OpenAI API Key");
+      throw new Error("Please set OpenAI API Key");
     }
 
     const page = await this.autoPartAPI.getProductsPage(input);
