@@ -32,18 +32,20 @@ export class StatsService {
       });
 
       if (!settings) {
-        return {
-          productsCount: parseInt(productsCount[0].count),
-        };
+        throw new Error("Settings not found for user");
       }
 
-      const wooCoomerce = this.wooCommerceService.init(
-        settings.siteURL,
-        settings.consumerKey,
-        settings.consumerSecret,
-      );
+      let wpProductsCount = 0;
 
-      const wpProductsCount = await wooCoomerce.getProductsCount();
+      if (settings.siteURL && settings.consumerKey && settings.consumerSecret) {
+        const wooCoomerce = this.wooCommerceService.init(
+          settings.siteURL,
+          settings.consumerKey,
+          settings.consumerSecret,
+        );
+
+        wpProductsCount = await wooCoomerce.getProductsCount();
+      }
 
       const campaignsCount = await this.ecampaignRepository.count({
         where: {
