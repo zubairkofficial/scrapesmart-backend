@@ -1,5 +1,6 @@
 import { EntityBase } from "@/common/entities/base.entity";
-import { Column, Entity } from "typeorm";
+import { User } from "@/user/entities/user.entity";
+import { Column, Entity, JoinColumn, OneToOne } from "typeorm";
 
 @Entity()
 export class Settings extends EntityBase {
@@ -7,8 +8,23 @@ export class Settings extends EntityBase {
   openAIAPIKey: string;
 
   @Column({ type: "varchar", length: 255, default: "" })
-  adAccountID: string;
+  model: string;
 
   @Column({ type: "varchar", length: 255, default: "" })
-  model: string;
+  siteURL: string;
+
+  @Column({ type: "varchar", length: 255, default: "" })
+  consumerKey: string;
+
+  @Column({ type: "varchar", length: 255, default: "" })
+  consumerSecret: string;
+
+  @Column({ type: "varchar", length: 300, default: "" })
+  metaAccessToken: string;
+
+  @OneToOne(() => User, {
+    onDelete: "CASCADE",
+  })
+  @JoinColumn()
+  user: User;
 }

@@ -10,10 +10,25 @@ export class CreateSettingsDto {
   @IsString()
   @IsOptional()
   @ApiProperty()
-  adAccountID?: string;
+  siteURL?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty()
+  consumerKey?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty()
+  consumerSecret?: string;
 
   @IsString()
   @IsOptional()
   @ApiProperty()
   model?: string;
+
+  @IsString()
+  @IsOptional()
+  @ApiProperty()
+  metaAccessToken?: string;
 }

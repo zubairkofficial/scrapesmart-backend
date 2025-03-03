@@ -1,6 +1,8 @@
+import { Chat } from "@/chat/entities/chat.entity";
 import { EntityBase } from '@/common/entities/base.entity';
 import { generatePasswordHash } from '@/common/utils/bcrypt';
-import { BeforeInsert, Column, Entity } from 'typeorm';
+import { Settings } from "@/settings/entities/settings.entity";
+import { BeforeInsert, Column, Entity, OneToMany } from 'typeorm';
 
 @Entity()
 export class User extends EntityBase {
@@ -18,6 +20,12 @@ export class User extends EntityBase {
 
   @Column({ type: 'boolean', default: false })
   isEmailVerified: boolean;
+
+  @OneToMany(() => Chat, (chat) => chat.user)
+  chats: Promise<Chat[]>;
+
+  @OneToMany(() => Settings, (settings) => settings.user)
+  settings: Promise<Settings[]>;
 
   @BeforeInsert()
   beforeInsert() {

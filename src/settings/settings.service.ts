@@ -1,39 +1,56 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import OpenAI from "openai";
 import { Repository } from "typeorm";
-import { CreateSettingsDto } from './dto/create-settings.dto';
+import { CreateSettingsDto } from "./dto/create-settings.dto";
 import { Settings } from "./entities/settings.entity";
 
 @Injectable()
 export class SettingsService {
   constructor(
-    @InjectRepository(Settings) private readonly settingsRepository: Repository<Settings>,
-  ) { }
+    @InjectRepository(Settings)
+    private readonly settingsRepository: Repository<Settings>,
+  ) {}
 
-  async save(newConfig: CreateSettingsDto) {
-    const existingConfig = (await this.settingsRepository.find())?.[0];
+  async save(newConfig: CreateSettingsDto, userID: string) {
+    const existingConfig = await this.settingsRepository.findOne({
+      where: { user: { ID: userID } },
+    });
     if (existingConfig) {
-      existingConfig.model = newConfig.model;
-      existingConfig.adAccountID = newConfig.adAccountID;
-      existingConfig.openAIAPIKey = newConfig.openAIAPIKey;
-      await existingConfig.save()
+      await this.settingsRepository.update(
+        {
+          ID: existingConfig.ID,
+        },
+        newConfig,
+      );
       return existingConfig;
     } else {
-      return this.settingsRepository.save(newConfig);
+      return this.settingsRepository.save({
+        ...newConfig,
+        user: { ID: userID },
+      });
     }
   }
 
-  async get() {
-    const config = await this.settingsRepository.find({
-      select: ["openAIAPIKey", "adAccountID", "model"],
+  async get(userID: string) {
+    const config = await this.settingsRepository.findOne({
+      where: { user: { ID: userID } },
+      select: {
+        createdAt: false,
+        updatedAt: false,
+      },
     });
 
-    if (config?.[0]) {
-      const client = new OpenAI({
-        apiKey: config?.[0]?.openAIAPIKey
-      });
-      const modelsList = await client.models.list();
+    if (config) {
+      let modelsList;
+      try {
+        const client = new OpenAI({
+          apiKey: config.openAIAPIKey,
+        });
+        modelsList = await client.models.list();
+      } catch (e) {
+        console.error(e);
+      }
       const models = [];
       if (modelsList?.data && modelsList?.data?.length) {
         for (const model of modelsList.data) {
@@ -43,10 +60,11 @@ export class SettingsService {
         }
       }
       return {
-        ...config[0],
-        models
-      }
+        ...config,
+        models,
+      };
     }
+
     return {};
   }
 }

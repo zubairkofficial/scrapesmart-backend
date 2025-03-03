@@ -1,4 +1,5 @@
 import { AuthGuard } from "@/auth/guards/auth.guard";
+import { CurrentUser } from "@/common/decorators/currentUser.decorator";
 import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { CreateSettingsDto } from './dto/create-settings.dto';
@@ -11,13 +12,13 @@ export class SettingsController {
   constructor(private readonly settingsService: SettingsService) { }
 
   @Post()
-  saveSettings(@Body() createConfigDto: CreateSettingsDto) {
-    return this.settingsService.save(createConfigDto);
+  saveSettings(@Body() createConfigDto: CreateSettingsDto, @CurrentUser() user: CurrentUserType) {
+    return this.settingsService.save(createConfigDto, user.ID);
   }
 
   @Get()
-  getSettings() {
-    return this.settingsService.get();
+  getSettings(@CurrentUser() user: CurrentUserType) {
+    return this.settingsService.get(user.ID);
   }
 
 }

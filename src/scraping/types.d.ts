@@ -1,5 +1,7 @@
 export interface IProduct {
   year: number;
+  wooCommerceID: number | null;
+  wooCommerceLink: number | null;
   partName: string;
   model: string;
   miles: null;

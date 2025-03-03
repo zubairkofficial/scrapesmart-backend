@@ -1,15 +1,17 @@
-import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
+import { Module } from "@nestjs/common";
+import { ConfigModule, ConfigService } from "@nestjs/config";
+import { TypeOrmModule } from "@nestjs/typeorm";
+import { DataSource } from "typeorm";
+import { AdvertModule } from "./advert/advert.module";
 import { AppController } from "./app.controller";
-import { AuthModule } from './auth/auth.module';
-import { ChatModule } from './chat/chat.module';
+import { AuthModule } from "./auth/auth.module";
+import { ChatModule } from "./chat/chat.module";
 import { AuthTokenSubscriber } from "./common/subscribers/AuthToken.subscriber";
-import { ScrapingModule } from './scraping/scraping.module';
+import { ScrapingModule } from "./scraping/scraping.module";
 import { SettingsModule } from "./settings/settings.module";
-import { SharedModule } from './shared/shared.module';
-import { UserModule } from './user/user.module';
+import { SharedModule } from "./shared/shared.module";
+import { StatsModule } from "./stats/stats.module";
+import { UserModule } from "./user/user.module";
 
 @Module({
   controllers: [AppController],
@@ -19,13 +21,13 @@ import { UserModule } from './user/user.module';
       inject: [ConfigService],
       useFactory: (configService: ConfigService) => {
         return {
-          name: 'default',
-          type: 'postgres',
-          host: configService.get<string>('DB_HOST'),
-          port: configService.get<number>('DB_PORT'),
-          username: configService.get<string>('DB_USERNAME'),
-          password: configService.get<string>('DB_PASSWORD'),
-          database: configService.get<string>('DB_NAME'),
+          name: "default",
+          type: "postgres",
+          host: configService.get<string>("DB_HOST"),
+          port: configService.get<number>("DB_PORT"),
+          username: configService.get<string>("DB_USERNAME"),
+          password: configService.get<string>("DB_PASSWORD"),
+          database: configService.get<string>("DB_NAME"),
           subscribers: [AuthTokenSubscriber],
           entities: [`dist/**/entities/*.js`],
           synchronize: true, // TODO: for development purpose
@@ -35,7 +37,7 @@ import { UserModule } from './user/user.module';
       },
       async dataSourceFactory(options) {
         if (!options) {
-          throw new Error('Invalid DB credentials specified');
+          throw new Error("Invalid DB credentials specified");
         }
 
         return new DataSource(options);
@@ -50,6 +52,9 @@ import { UserModule } from './user/user.module';
     ScrapingModule,
     ChatModule,
     SettingsModule,
+    AdvertModule,
+    StatsModule,
   ],
+  providers: [],
 })
-export class AppModule { }
+export class AppModule {}
