@@ -1,6 +1,7 @@
 import { Settings } from "@/settings/entities/settings.entity";
 import { ChatOpenAI } from "@langchain/openai";
 import { BadRequestException, Injectable } from "@nestjs/common";
+import { ConfigService } from "@nestjs/config";
 import { InjectDataSource, InjectRepository } from "@nestjs/typeorm";
 import axios from "axios";
 import * as adsSdk from "facebook-nodejs-business-sdk";
@@ -30,6 +31,7 @@ export class AdvertService {
     private readonly eAdCreativeRepository: Repository<EAdCreative>,
     @InjectRepository(EAd)
     private readonly eAdRepository: Repository<EAd>,
+    private readonly configService: ConfigService,
   ) {}
 
   async generateProductDescription(
@@ -250,12 +252,12 @@ export class AdvertService {
           page_id: pageID,
           link_data: {
             image_hash: adImage._data.images.bytes.hash,
-            link: "https://google.com",
+            link: "https://cyberify.co",
             message: createAdvertDto.description,
             call_to_action: {
               type: "LEARN_MORE",
               value: {
-                link: "https://google.com",
+                link: "https://cyberify.co",
               },
             },
           },
@@ -330,7 +332,7 @@ export class AdvertService {
         };
       }
     >(
-      `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${process.env.META_APP_ID}&redirect_uri=https://165f-154-192-207-87.ngrok-free.app/advert/auth/callback&client_secret=${process.env.META_APP_SECRET}&code=${code}`,
+      `https://graph.facebook.com/v22.0/oauth/access_token?client_id=${this.configService.get("META_APP_ID")}&redirect_uri=${this.configService.get("BACKEND_URL")}/advert/auth/callback&client_secret=${this.configService.get("META_APP_SECRET")}&code=${code}`,
     );
 
     const settings = await this.settingsRepository.findOne({

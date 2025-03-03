@@ -45,7 +45,7 @@ export class AdvertController {
 
   @Get("auth")
   async authRedirect(@CurrentUser() user: CurrentUserType) {
-    const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${process.env.META_APP_ID}&redirect_uri=https://165f-154-192-207-87.ngrok-free.app/advert/auth/callback&state=${user.ID}&response_type=code&config_id=${process.env.META_APP_CONFIG}`;
+    const url = `https://www.facebook.com/v22.0/dialog/oauth?client_id=${this.configService.get("META_APP_ID")}&redirect_uri=${this.configService.get("BACKEND_URL")}/advert/auth/callback&state=${user.ID}&response_type=code&config_id=${this.configService.get("META_APP_CONFIG")}`;
     return {
       url,
     };
