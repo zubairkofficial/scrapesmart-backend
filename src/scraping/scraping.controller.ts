@@ -24,8 +24,11 @@ export class ScrapingController {
     @Query() input: ScrapeSourceInput,
     @CurrentUser() user: CurrentUserType,
   ) {
-    const numOfProducts = await this.scrapingService.scrapeSource(input, user);
-    return numOfProducts;
+    const productsObservable = await this.scrapingService.scrapeSource(
+      input,
+      user,
+    );
+    return productsObservable;
   }
 
   @Sse("/form")
@@ -33,8 +36,11 @@ export class ScrapingController {
     @Query() input: ScrapeInput,
     @CurrentUser() user: CurrentUserType,
   ) {
-    const numOfProducts = await this.scrapingService.scrapeForm(input, user);
-    return numOfProducts;
+    const productsObservable = await this.scrapingService.scrapeForm(
+      input,
+      user,
+    );
+    return productsObservable;
   }
 
   @Post("/check-inter")

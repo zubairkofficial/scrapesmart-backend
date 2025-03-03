@@ -34,6 +34,15 @@ export class WooCommerceService {
 
   async createProducts(products: IProduct[], subscriber?: Subscriber<any>) {
     for (let i = 0; i < products.length; i++) {
+      subscriber &&
+        subscriber.next({
+          data: {
+            type: "images",
+            current: i + 1,
+            total: products.length,
+          },
+        });
+
       const product = products[i];
       const { data } = await this.client.post("/products", {
         name: `${product.partName} ${product.year} ${product.model}`,
@@ -49,15 +58,6 @@ export class WooCommerceService {
 
       product.wooCommerceID = data.id;
       product.wooCommerceLink = data.permalink;
-
-      subscriber &&
-        subscriber.next({
-          data: {
-            type: "images",
-            current: i + 1,
-            total: products.length,
-          },
-        });
     }
     return "done";
   }

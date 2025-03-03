@@ -370,7 +370,6 @@ export class ScrapingService {
             });
           }
 
-          // await this.shopifyAPI.createProducts(products);
           await woocommerceAPI.createProducts(products, subscriber);
           await this.addProductsToStore(input.source, user, products);
           subscriber.next({
@@ -504,8 +503,8 @@ export class ScrapingService {
               } catch {}
             }
           }
-          // await this.addProductsToStore(page.config.url, user, products);
 
+          await this.addProductsToStore(page.config.url, user, products);
           const woocommerceAPI = this.woocommerce.init(
             settings?.[0].siteURL,
             settings?.[0].consumerKey,

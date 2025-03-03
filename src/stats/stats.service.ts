@@ -57,7 +57,7 @@ export class StatsService {
         {
           type: "products",
           title: "Total Products",
-          value: parseInt(productsCount[0].count),
+          value: productsCount[0].count,
           difference: "-5%",
         },
         {
@@ -74,7 +74,26 @@ export class StatsService {
         },
       ];
     } catch {
-      return [];
+      return [
+        {
+          type: "products",
+          title: "Total Products",
+          value: 0,
+          difference: "0%",
+        },
+        {
+          type: "uploadedProducts",
+          title: "Uploaded Products",
+          value: 0,
+          difference: "0%",
+        },
+        {
+          type: "campaigns",
+          title: "Total Campaigns",
+          value: 0,
+          difference: "0%",
+        },
+      ];
     }
   }
 }
