@@ -37,15 +37,21 @@ export class StatsService {
 
       let wpProductsCount = 0;
 
-      if (settings.siteURL && settings.consumerKey && settings.consumerSecret) {
-        const wooCoomerce = this.wooCommerceService.init(
-          settings.siteURL,
-          settings.consumerKey,
-          settings.consumerSecret,
-        );
+      try {
+        if (
+          settings.siteURL &&
+          settings.consumerKey &&
+          settings.consumerSecret
+        ) {
+          const wooCoomerce = this.wooCommerceService.init(
+            settings.siteURL,
+            settings.consumerKey,
+            settings.consumerSecret,
+          );
 
-        wpProductsCount = await wooCoomerce.getProductsCount();
-      }
+          wpProductsCount = await wooCoomerce.getProductsCount();
+        }
+      } catch (error) {}
 
       const campaignsCount = await this.ecampaignRepository.count({
         where: {
@@ -75,7 +81,7 @@ export class StatsService {
           difference: "+15%",
         },
       ];
-    } catch {
+    } catch (error) {
       return [
         {
           type: "products",
