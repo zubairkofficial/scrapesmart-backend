@@ -597,7 +597,7 @@ export class ScrapingService {
     });
 
     return {
-      products: transformedProductData,
+      rows: transformedProductData,
       currentPage: pageNumber,
       totalPages,
       isNextPage,
