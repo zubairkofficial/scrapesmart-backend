@@ -158,7 +158,7 @@ export class ScrapingService {
               null;
             originalPrice = price;
             const priceValue = extractNumber(price);
-            const isNumber = typeof priceValue === "number";
+            const isNumber = priceValue && typeof priceValue === "number";
             price = isNumber
               ? `$${Number(priceValue * 1.3).toFixed(2)}`
               : price;
