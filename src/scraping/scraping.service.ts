@@ -700,6 +700,13 @@ export class ScrapingService {
     );
     await woocommerceAPI.createProducts([product]);
 
+    if (!product.wooCommerceID) {
+      if (!product.images?.length)
+        throw new BadRequestException("Product has no image");
+      if (!product.price) throw new BadRequestException("Product has no price");
+      throw new BadRequestException("Product not uploaded to WooCommerce");
+    }
+
     await this.productsRepository.save(product);
 
     await this.dataSource.query(
