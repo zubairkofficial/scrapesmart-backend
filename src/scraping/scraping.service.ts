@@ -682,7 +682,9 @@ export class ScrapingService {
       !settings.consumerKey ||
       !settings.consumerSecret
     ) {
-      throw new Error("Please set site URL and consumer key and secret.");
+      throw new BadRequestException(
+        "Please set site URL and consumer key and secret.",
+      );
     }
 
     const product = await this.productsRepository.findOneBy({
@@ -690,7 +692,7 @@ export class ScrapingService {
     });
 
     if (!product) {
-      throw new Error("Product not found");
+      throw new BadRequestException("Product not found");
     }
 
     const woocommerceAPI = this.woocommerce.init(
