@@ -1,17 +1,21 @@
+type Nullable<T> = { [K in keyof T]: T[K] | null };
+
 export interface IProduct {
   year: number;
-  wooCommerceID: number | null;
-  wooCommerceLink: number | null;
+  wooCommerceID: number;
+  wooCommerceLink: string;
   partName: string;
   model: string;
-  miles: null;
   stockID: string;
-  images: string[] | null;
-  distKM: null;
+  images: string[];
+  distKM: string;
   description: string;
   imageURL: string;
   partGrade: string;
   price: string;
+  miles: string;
+  originalPrice: number;
+  source: string;
   dealer: IDealer;
 }
 

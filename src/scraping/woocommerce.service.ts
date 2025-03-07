@@ -1,8 +1,8 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, InternalServerErrorException } from "@nestjs/common";
 import axios, { AxiosInstance } from "axios";
 import * as https from "https";
 import { Subscriber } from "rxjs";
-import { IProduct } from "./types";
+import { Product } from "./entities/product.entity";
 
 @Injectable()
 export class WooCommerceService {
@@ -32,7 +32,7 @@ export class WooCommerceService {
     return data;
   }
 
-  async createProducts(products: IProduct[], subscriber?: Subscriber<any>) {
+  async createProducts(products: Product[], subscriber?: Subscriber<any>) {
     for (let i = 0; i < products.length; i++) {
       subscriber &&
         subscriber.next({
@@ -43,21 +43,31 @@ export class WooCommerceService {
           },
         });
 
-      const product = products[i];
-      const { data } = await this.client.post("/products", {
-        name: `${product.partName} ${product.year} ${product.model}`,
-        type: "simple",
-        regular_price: ((+product.price.match(/\d+/g)?.[0] | 0) * 1.3).toFixed(
-          2,
-        ),
-        description: `<h1>${product.partName} ${product.year} ${product.model}</h1><p>${product.description}</p>`,
-        images: product.images.map((image) => ({
-          src: image,
-        })),
-      });
+      try {
+        const product = products[i];
+        const { data } = await this.client.post("/products", {
+          name: `${product.partName} ${product.year} ${product.model}`,
+          type: "simple",
+          regular_price: (
+            (+product.price.match(/\d+/g)?.[0] | 0) *
+            1.3
+          ).toFixed(2),
+          description: `<h1>${product.partName} ${product.year} ${product.model}</h1><p>${product.description}</p>`,
+          images: product.images.map((image) => ({
+            src: image,
+          })),
+        });
 
-      product.wooCommerceID = data.id;
-      product.wooCommerceLink = data.permalink;
+        product.wooCommerceID = data.id;
+        product.wooCommerceLink = data.permalink;
+      } catch (error) {
+        if (subscriber) {
+          throw error;
+        }
+        throw new InternalServerErrorException(
+          "Error uploading the product to WooCommerce",
+        );
+      }
     }
     return "done";
   }

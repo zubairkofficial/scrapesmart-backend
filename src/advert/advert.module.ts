@@ -7,18 +7,10 @@ import { EAdCreative } from "./entities/ad-creative.entity";
 import { EAd } from "./entities/ad.entity";
 import { EAdset } from "./entities/adset.entity";
 import { ECampaign } from "./entities/campaign.entity";
-import { Description } from "./entities/description.entity";
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([
-      Settings,
-      Description,
-      ECampaign,
-      EAdset,
-      EAdCreative,
-      EAd,
-    ]),
+    TypeOrmModule.forFeature([Settings, ECampaign, EAdset, EAdCreative, EAd]),
   ],
   controllers: [AdvertController],
   providers: [AdvertService],

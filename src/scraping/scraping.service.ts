@@ -4,10 +4,16 @@ import { BadRequestException, Inject, Injectable } from "@nestjs/common";
 import { InjectRepository } from "@nestjs/typeorm";
 import * as chr from "cheerio";
 import { Observable } from "rxjs";
-import { DataSource, Repository } from "typeorm";
+import { DataSource, DeepPartial, ILike, Raw, Repository } from "typeorm";
 import { AutoPartService } from "./auto-part.service";
-import { ScrapeInput, ScrapeSourceInput } from "./dto/scraping.dto";
+import {
+  ScrapeInput,
+  ScrapeSourceInput,
+  WordpressUploadInput,
+} from "./dto/scraping.dto";
+import { Product } from "./entities/product.entity";
 import { ShopifyService } from "./shopify.service";
+import { IProduct, Nullable } from "./types";
 import { WooCommerceService } from "./woocommerce.service";
 
 function extractNumber(text: string) {
@@ -31,6 +37,8 @@ export class ScrapingService {
   constructor(
     @InjectRepository(Settings)
     private settingsRepository: Repository<Settings>,
+    @InjectRepository(Product)
+    private productsRepository: Repository<Product>,
     private dataSource: DataSource,
     private autoPartAPI: AutoPartService,
     private shopifyAPI: ShopifyService,
@@ -39,7 +47,7 @@ export class ScrapingService {
   ) {}
 
   private async scrapeProducts(secondLayout: boolean, $: chr.CheerioAPI) {
-    const products = [];
+    const products: DeepPartial<Nullable<IProduct>>[] = [];
 
     const tableRows = secondLayout
       ? $(
@@ -149,19 +157,19 @@ export class ScrapingService {
           }
 
           // Extract price
-          let price = null;
-          let originalPrice = null;
+          let price: string | null = null;
+          let originalPrice: number | null = null;
           if (mappedTds["price"]) {
             const priceText = $(tds[mappedTds["price"]]).text().split("\n")[0];
             price =
               priceText.match(/^\$.*/g)?.[0]?.replace(/(actual|undmg)$/, "") ||
               null;
-            originalPrice = price;
             const priceValue = extractNumber(price);
             const isNumber = priceValue && typeof priceValue === "number";
             price = isNumber
               ? `$${Number(priceValue * 1.3).toFixed(2)}`
               : price;
+            originalPrice = isNumber ? Number(priceValue) : null;
           }
 
           // Extract dealer info
@@ -246,18 +254,37 @@ export class ScrapingService {
     return products;
   }
 
-  private async addProductsToStore(source, user, products) {
-    const documents = products.map((product) => ({
+  private async addProductsToStore(
+    source: string,
+    user: CurrentUserType,
+    products: Nullable<IProduct>[],
+  ) {
+    const productsDocs = products.map((product, index) => {
+      const createdAt = new Date(Date.now() + index);
+
+      return this.productsRepository.create({
+        ...product,
+        source,
+        user: {
+          ID: user.ID,
+        },
+        createdAt,
+      });
+    });
+
+    const dbProducts = await this.productsRepository.save(productsDocs);
+
+    const documents = dbProducts.map((product) => ({
       pageContent: JSON.stringify(product),
       metadata: {
         source,
-        product,
         user: user.ID,
-        createdAt: new Date(),
+        productID: product.ID,
+        createdAt: product.createdAt,
       },
     }));
 
-    this.pgVectorStore.addDocuments(documents);
+    await this.pgVectorStore.addDocuments(documents);
   }
 
   async scrapeSource(input: ScrapeSourceInput, user: CurrentUserType) {
@@ -323,17 +350,14 @@ export class ScrapingService {
       searchParams.set("userPage", "1");
     }
 
-    const woocommerceAPI = this.woocommerce.init(
-      settings?.siteURL,
-      settings?.consumerKey,
-      settings?.consumerSecret,
-    );
-
     const products = [];
 
     const getPage = async (pageNum: number) => {
-      const url = new URL(input.source);
-      url.searchParams.set("userPage", pageNum.toString());
+      // const url = new URL(input.source);
+      // url.searchParams.set("userPage", pageNum.toString());
+      const url = new URL(
+        input.source.replace(/userPage=[^&]+/, pageNum.toString()),
+      );
       const page = await chr.fromURL(url, {
         requestOptions: {
           method: "GET",
@@ -371,10 +395,16 @@ export class ScrapingService {
           }
 
           if (
+            input.uploadToWordpress &&
             settings.siteURL &&
             settings.consumerKey &&
             settings.consumerSecret
           ) {
+            const woocommerceAPI = this.woocommerce.init(
+              settings?.siteURL,
+              settings?.consumerKey,
+              settings?.consumerSecret,
+            );
             await woocommerceAPI.createProducts(products, subscriber);
           }
           await this.addProductsToStore(input.source, user, products);
@@ -517,16 +547,18 @@ export class ScrapingService {
           }
 
           await this.addProductsToStore(page.config.url, user, products);
-          const woocommerceAPI = this.woocommerce.init(
-            settings?.[0].siteURL,
-            settings?.[0].consumerKey,
-            settings?.[0].consumerSecret,
-          );
+
           if (
+            input.uploadToWordpress &&
             settings?.[0].siteURL &&
             settings?.[0].consumerKey &&
             settings?.[0].consumerSecret
           ) {
+            const woocommerceAPI = this.woocommerce.init(
+              settings?.[0].siteURL,
+              settings?.[0].consumerKey,
+              settings?.[0].consumerSecret,
+            );
             await woocommerceAPI.createProducts(products, subscriber);
           }
 
@@ -553,54 +585,137 @@ export class ScrapingService {
     limit: number,
     query?: string,
   ) {
-    let count;
-    let products;
+    const count = await this.productsRepository.count({
+      where: query
+        ? [
+            {
+              partName: ILike(`%${query}%`),
+              user: {
+                ID: user.ID,
+              },
+            },
+            {
+              model: ILike(`%${query}%`),
+              user: {
+                ID: user.ID,
+              },
+            },
+            {
+              dealer: Raw(
+                (alias) =>
+                  `"${alias.split(".")[0]}".${alias.split(".")[1]}->>'email' ILIKE '%${query}%'`,
+              ),
+              user: {
+                ID: user.ID,
+              },
+            },
+          ]
+        : {
+            user: {
+              ID: user.ID,
+            },
+          },
+    });
 
-    if (query) {
-      count = await this.dataSource.query(
-        "SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILike $2 OR (metadata->'product'->>'model') ILike $2 OR (metadata->'product'->'dealer'->>'email') ILike $2)",
-        [user.ID, `%${query}%`],
-      );
-    } else {
-      count = await this.dataSource.query(
-        "SELECT COUNT(*) FROM scraping_vector_store WHERE metadata->>'user' = $1",
-        [user.ID],
-      );
-    }
-
-    const totalPages = Math.ceil(count[0].count / limit);
-
-    const isNextPage = page < totalPages;
-
-    const pageNumber = Math.min(page, totalPages);
-
-    const OFFSET = Math.max((pageNumber - 1) * limit, 0);
-
-    if (query) {
-      products = await this.dataSource.query(
-        `SELECT "ID", "metadata" FROM scraping_vector_store WHERE metadata->>'user' = $1 AND ((metadata->'product'->>'partName') ILIKE $2 OR (metadata->'product'->>'model') ILIKE $2 OR (metadata->'product'->'dealer'->>'email') ILIKE $2) LIMIT $3 OFFSET $4`,
-        [user.ID, `%${query}%`, limit, OFFSET],
-      );
-    } else {
-      products = await this.dataSource.query(
-        `SELECT "ID", "metadata" FROM scraping_vector_store WHERE metadata->>'user' = $1 LIMIT $2 OFFSET $3`,
-        [user.ID, limit, OFFSET],
-      );
-    }
-
-    const transformedProductData = products.map((product) => {
-      return {
-        ID: product.ID,
-        ...product.metadata.product,
-        createdAt: product.metadata.createdAt,
-      };
+    const totalPages = Math.ceil(count / limit);
+    const pageNumber = Math.max(1, Math.min(page, totalPages || 1));
+    const isNextPage = pageNumber < totalPages;
+    const skip = (pageNumber - 1) * limit;
+    const products = await this.productsRepository.find({
+      where: query
+        ? [
+            {
+              partName: ILike(`%${query}%`),
+              user: {
+                ID: user.ID,
+              },
+            },
+            {
+              model: ILike(`%${query}%`),
+              user: {
+                ID: user.ID,
+              },
+            },
+            {
+              dealer: Raw(
+                (alias) =>
+                  `"${alias.split(".")[0]}".${alias.split(".")[1]}->>'email' ILIKE '%${query}%'`,
+              ),
+              user: {
+                ID: user.ID,
+              },
+            },
+          ]
+        : {
+            user: {
+              ID: user.ID,
+            },
+          },
+      skip: skip,
+      take: limit,
+      order: { createdAt: "DESC" },
     });
 
     return {
-      rows: transformedProductData,
+      rows: products,
       currentPage: pageNumber,
       totalPages,
       isNextPage,
     };
+  }
+
+  async uploadProductToWordpress(
+    body: WordpressUploadInput,
+    user: CurrentUserType,
+  ) {
+    const settings = await this.settingsRepository.findOne({
+      where: {
+        user: {
+          ID: user.ID,
+        },
+      },
+    });
+
+    if (
+      !settings ||
+      !settings.siteURL ||
+      !settings.consumerKey ||
+      !settings.consumerSecret
+    ) {
+      throw new Error("Please set site URL and consumer key and secret.");
+    }
+
+    const product = await this.productsRepository.findOneBy({
+      ID: body.productID,
+    });
+
+    if (!product) {
+      throw new Error("Product not found");
+    }
+
+    const woocommerceAPI = this.woocommerce.init(
+      settings.siteURL,
+      settings.consumerKey,
+      settings.consumerSecret,
+    );
+    await woocommerceAPI.createProducts([product]);
+
+    await this.productsRepository.save(product);
+
+    await this.dataSource.query(
+      `DELETE FROM scraping_vector_store WHERE metadata->>'productID' = $1`,
+      [body.productID],
+    );
+    const document = {
+      pageContent: JSON.stringify(product),
+      metadata: {
+        source: product.source,
+        user: user.ID,
+        productID: product.ID,
+        createdAt: product.createdAt,
+      },
+    };
+
+    await this.pgVectorStore.addDocuments([document]);
   }
 }

@@ -11,7 +11,11 @@ import {
 } from "@nestjs/common";
 import { ApiBearerAuth } from "@nestjs/swagger";
 import { Observable } from "rxjs";
-import { ScrapeInput, ScrapeSourceInput } from "./dto/scraping.dto";
+import {
+  ScrapeInput,
+  ScrapeSourceInput,
+  WordpressUploadInput,
+} from "./dto/scraping.dto";
 import { ScrapingService } from "./scraping.service";
 
 @ApiBearerAuth("access-token")
@@ -94,6 +98,11 @@ export class ScrapingController {
     );
   }
 
-  @Post("/product")
-  async getProductDescription() {}
+  @Post("/uploadToWordpress")
+  async uploadProductToWordpress(
+    @Body() body: WordpressUploadInput,
+    @CurrentUser() user: CurrentUserType,
+  ) {
+    return this.scrapingService.uploadProductToWordpress(body, user);
+  }
 }

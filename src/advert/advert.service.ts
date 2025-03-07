@@ -12,7 +12,6 @@ import { EAdCreative } from "./entities/ad-creative.entity";
 import { EAd } from "./entities/ad.entity";
 import { EAdset } from "./entities/adset.entity";
 import { ECampaign } from "./entities/campaign.entity";
-import { Description } from "./entities/description.entity";
 import { BudgetType } from "./types";
 
 @Injectable()
@@ -20,8 +19,6 @@ export class AdvertService {
   constructor(
     @InjectRepository(Settings)
     private readonly settingsRepository: Repository<Settings>,
-    @InjectRepository(Description)
-    private readonly descriptionRepository: Repository<Description>,
     @InjectRepository(ECampaign)
     private readonly ecampaignRepository: Repository<ECampaign>,
     @InjectDataSource() private readonly dataSource: DataSource,
@@ -59,16 +56,6 @@ export class AdvertService {
       throw new BadRequestException("Product not found");
     }
 
-    const existingDescription = await this.descriptionRepository.findOne({
-      where: {
-        productID: createProductDescription.productID,
-      },
-    });
-
-    if (existingDescription) {
-      return existingDescription;
-    }
-
     const modelID = settings.model;
     if (!modelID) {
       throw new BadRequestException("Please set OpenAI Model ID in settings");
@@ -103,15 +90,9 @@ export class AdvertService {
       },
     ]);
 
-    const description = this.descriptionRepository.create({
-      productID: createProductDescription.productID,
+    return {
       description: res.description,
-      user: {
-        ID: userID,
-      },
-    });
-    const desc = await this.descriptionRepository.save(description);
-    return desc;
+    };
   }
 
   async createAd(createAdvertDto: CreateAdvertInput, userID: string) {
