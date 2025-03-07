@@ -45,13 +45,16 @@ export class WooCommerceService {
 
       try {
         const product = products[i];
+        if (!product.images.length) {
+          continue;
+        }
+        if (!product.price) {
+          continue;
+        }
         const { data } = await this.client.post("/products", {
           name: `${product.partName} ${product.year} ${product.model}`,
           type: "simple",
-          regular_price: (
-            (+product.price.match(/\d+/g)?.[0] | 0) *
-            1.3
-          ).toFixed(2),
+          regular_price: (+product.price.match(/\d+/g)?.[0] | 0).toFixed(2),
           description: `<h1>${product.partName} ${product.year} ${product.model}</h1><p>${product.description}</p>`,
           images: product.images.map((image) => ({
             src: image,
