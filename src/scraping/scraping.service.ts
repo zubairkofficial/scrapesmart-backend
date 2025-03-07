@@ -160,9 +160,9 @@ export class ScrapingService {
           let price: string | null = null;
           let originalPrice: number | null = null;
           if (mappedTds["price"]) {
-            const priceText = $(tds[mappedTds["price"]]).text().split("\n")[0];
+            const priceText = $(tds[mappedTds["price"]]).text();
             price =
-              priceText.match(/^\$.*/g)?.[0]?.replace(/(actual|undmg)$/, "") ||
+              priceText.match(/^\$.*/gm)?.[0]?.replace(/(actual|undmg)$/, "") ||
               null;
             const priceValue = extractNumber(price);
             const isNumber = priceValue && typeof priceValue === "number";
